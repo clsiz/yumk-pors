@@ -10,7 +10,7 @@ export type AuthContext = {
 };
 
 const profileColumns =
-  "id, username, full_name, phone, student_number, department, role, is_active, created_at";
+  "id, username, full_name, email, phone, student_number, department, role, is_active, created_at";
 
 export async function getAuthContext(): Promise<AuthContext> {
   const supabase = await createClient();

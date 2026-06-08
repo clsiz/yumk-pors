@@ -40,7 +40,7 @@ export async function loginAction(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, username, full_name, phone, student_number, department, role, is_active, created_at")
+    .select("id, username, full_name, email, phone, student_number, department, role, is_active, created_at")
     .eq("id", user.id)
     .maybeSingle();
 

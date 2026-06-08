@@ -78,6 +78,7 @@ create table public.profiles (
   id uuid primary key references auth.users(id),
   username text unique not null,
   full_name text not null,
+  email text,
   phone text,
   student_number text,
   department text,
@@ -90,6 +91,10 @@ create table public.profiles (
 Admins create users by creating the Supabase Auth user with an internal local
 email such as `username@yumk.local`, then creating the matching `profiles` row
 with the same `auth.users.id`.
+
+The optional `profiles.email` field is a contact field reserved for future
+contact, notification, and account recovery support. It is not used for the
+current login flow. Users continue to sign in with username and password only.
 
 ## Reservation Model
 
