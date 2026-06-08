@@ -9,6 +9,9 @@ export type CalendarSlotSummary = {
   time: string;
   status: CalendarSlotStatus;
   statusLabel: "Available" | "Reserved" | "Closed";
+  reservationRequesterName?: string;
+  reservationRequesterUsername?: string;
+  blockTitle?: string;
 };
 
 export type ReservationSlot =
@@ -48,6 +51,10 @@ export type AdminReservationRequest = ReservationRequest & {
     | "student_number"
     | "department"
   > | null;
+};
+
+export type AdminCalendarReservation = ReservationRequest & {
+  requester: Pick<Profile, "id" | "username" | "full_name"> | null;
 };
 
 export type ReservationStatusHistory = {
