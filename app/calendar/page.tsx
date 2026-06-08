@@ -3,6 +3,8 @@ import { CalendarWeek } from "@/components/calendar-week";
 import { requireProfile } from "@/lib/auth/session";
 import {
   buildCalendarSlotSummaries,
+  fetchAdminCalendarBlocksForRange,
+  fetchAdminCalendarRequestsForRange,
   fetchAdminCalendarAvailability,
   fetchCalendarPendingRequestCounts,
   fetchMemberCalendarAvailability,
@@ -37,6 +39,8 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
   const [
     { availability, error: availabilityError },
     { pendingCounts, error: pendingCountsError },
+    { requests: adminRequests, error: adminRequestsError },
+    { blocks: adminBlocks, error: adminBlocksError },
   ] =
     firstRange && lastRange
       ? await Promise.all([
@@ -50,20 +54,42 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
             firstRange.startTime,
             lastRange.endTime,
           ),
+          profile.role === "admin"
+            ? fetchAdminCalendarRequestsForRange(
+                supabase,
+                firstRange.startTime,
+                lastRange.endTime,
+              )
+            : Promise.resolve({ requests: [], error: null }),
+          profile.role === "admin"
+            ? fetchAdminCalendarBlocksForRange(
+                supabase,
+                firstRange.startTime,
+                lastRange.endTime,
+              )
+            : Promise.resolve({ blocks: [], error: null }),
         ])
       : [
           { availability: [], error: null },
           { pendingCounts: [], error: null },
+          { requests: [], error: null },
+          { blocks: [], error: null },
         ];
 
   const calendarDays = buildCalendarSlotSummaries(
     dates,
     availability,
     pendingCounts,
+    profile.role === "admin"
+      ? { adminRequests, adminBlocks }
+      : undefined,
   );
   const loadError =
     params.error ||
-    (availabilityError || pendingCountsError
+    (availabilityError ||
+    pendingCountsError ||
+    adminRequestsError ||
+    adminBlocksError
       ? "Could not load calendar availability. Try again later."
       : undefined);
 
@@ -73,7 +99,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
         <div>
           <h1 className="text-3xl font-bold text-ink">Calendar</h1>
           <p className="mt-2 text-slate-600">
-            Anonymous availability for the single rehearsal room.
+            Weekly availability for the single rehearsal room.
           </p>
         </div>
         {profile.role === "admin" ? (

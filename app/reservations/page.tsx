@@ -5,6 +5,7 @@ import {
   createReservationRequestAction,
   rejectReservationRequestAction,
 } from "@/app/reservations/actions";
+import Link from "next/link";
 import { requireProfile } from "@/lib/auth/session";
 import {
   fetchAdminReservationRequests,
@@ -60,15 +61,32 @@ export default async function ReservationsPage({
   return (
     <ReservationsShell
       title="My Reservation Requests"
-      description="Create and review your own reservation requests."
+      description="Review your own reservation requests and cancellation status."
       notice={params.notice}
       error={params.error ?? (error ? "Could not load your reservation requests." : undefined)}
     >
-      <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-        <CreateReservationForm />
+      <div className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr]">
+        <MemberCalendarCallout />
         <MemberRequestList requests={requests} />
       </div>
     </ReservationsShell>
+  );
+}
+
+function MemberCalendarCallout() {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-ink">Request a new slot</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        To request a new rehearsal slot, choose an available time from the Calendar.
+      </p>
+      <Link
+        href="/calendar"
+        className="mt-5 inline-flex rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+      >
+        Open Calendar
+      </Link>
+    </div>
   );
 }
 
