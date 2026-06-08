@@ -1,10 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Profile } from "@/types/profile";
 import type {
-  AdminCalendarReservation,
   AdminReservationRequest,
-  CalendarBlock,
+  AdminCalendarAvailabilityRow,
   CalendarSlotSummary,
+  MemberCalendarAvailabilityRow,
   ReservationRequest,
   ReservationSlot,
 } from "@/types/reservation";
@@ -26,13 +26,8 @@ const RESERVATION_TIME_ZONE_OFFSET = "+03:00";
 const reservationRequestColumns =
   "id, user_id, start_time, end_time, purpose, participant_count, equipment_needs, status, admin_note, created_at, updated_at";
 
-const calendarBlockColumns =
-  "id, start_time, end_time, block_type, title, description, created_by, created_at";
-
 const profileColumns =
   "id, username, full_name, email, phone, student_number, department";
-
-const calendarRequesterColumns = "id, username, full_name";
 
 export type SlotRange = {
   startTime: string;
@@ -110,12 +105,6 @@ export function hasOverlap(
   // 11:00-12:00 vs 11:00-12:00 is true,
   // and 12:00-13:00 vs 11:00-12:00 is false.
   return newStartTime < existingEndTime && newEndTime > existingStartTime;
-}
-
-function hasCalendarRequester(
-  request: ReservationRequest | AdminCalendarReservation,
-): request is AdminCalendarReservation {
-  return "requester" in request;
 }
 
 export function formatReservationDateTime(value: string) {
@@ -254,130 +243,69 @@ export async function fetchAdminReservationRequests(supabase: SupabaseClient) {
   };
 }
 
-export async function fetchApprovedReservationsForRange(
+export async function fetchMemberCalendarAvailability(
   supabase: SupabaseClient,
   startTime: string,
   endTime: string,
 ) {
   const { data, error } = await supabase
-    .from("reservation_requests")
-    .select(reservationRequestColumns)
-    .eq("status", "approved")
-    .lt("start_time", endTime)
-    .gt("end_time", startTime);
+    .rpc("get_member_calendar_availability", {
+      range_start: startTime,
+      range_end: endTime,
+    });
 
   return {
-    requests: (data ?? []) as ReservationRequest[],
+    availability: (data ?? []) as MemberCalendarAvailabilityRow[],
     error,
   };
 }
 
-export async function fetchApprovedReservationsWithRequesterForRange(
+export async function fetchAdminCalendarAvailability(
   supabase: SupabaseClient,
   startTime: string,
   endTime: string,
 ) {
   const { data, error } = await supabase
-    .from("reservation_requests")
-    .select(reservationRequestColumns)
-    .eq("status", "approved")
-    .lt("start_time", endTime)
-    .gt("end_time", startTime);
-
-  if (error || !data?.length) {
-    return {
-      requests: (data ?? []) as AdminCalendarReservation[],
-      error,
-    };
-  }
-
-  const requests = data as ReservationRequest[];
-  const userIds = Array.from(new Set(requests.map((request) => request.user_id)));
-  const { data: profiles, error: profilesError } = await supabase
-    .from("profiles")
-    .select(calendarRequesterColumns)
-    .in("id", userIds);
-
-  if (profilesError) {
-    return {
-      requests: [],
-      error: profilesError,
-    };
-  }
-
-  const profilesById = new Map(
-    ((profiles ?? []) as Pick<
-      Profile,
-      "id" | "username" | "full_name"
-    >[]).map((profile) => [profile.id, profile]),
-  );
+    .rpc("get_admin_calendar_availability", {
+      range_start: startTime,
+      range_end: endTime,
+    });
 
   return {
-    requests: requests.map((request) => ({
-      ...request,
-      requester: profilesById.get(request.user_id) ?? null,
-    })),
-    error: null,
-  };
-}
-
-export async function fetchCalendarBlocksForRange(
-  supabase: SupabaseClient,
-  startTime: string,
-  endTime: string,
-) {
-  const { data, error } = await supabase
-    .from("calendar_blocks")
-    .select(calendarBlockColumns)
-    .lt("start_time", endTime)
-    .gt("end_time", startTime);
-
-  return {
-    blocks: (data ?? []) as CalendarBlock[],
+    availability: (data ?? []) as AdminCalendarAvailabilityRow[],
     error,
   };
 }
 
 export function buildCalendarSlotSummaries(
   dates: string[],
-  approvedReservations: (ReservationRequest | AdminCalendarReservation)[],
-  calendarBlocks: CalendarBlock[],
+  availabilityRows: (
+    | MemberCalendarAvailabilityRow
+    | AdminCalendarAvailabilityRow
+  )[],
 ) {
   return dates.map((date) =>
     RESERVATION_SLOTS.map((slot): CalendarSlotSummary => {
       const range = getReservationSlotRange(date, slot);
-      const closedBlock = range
-        ? calendarBlocks.find((block) =>
+      const occupiedSlot = range
+        ? availabilityRows.find((row) =>
             hasOverlap(
               range.startTime,
               range.endTime,
-              block.start_time,
-              block.end_time,
-            ),
-          )
-        : undefined;
-      const reservedRequest = range
-        ? approvedReservations.find((request) =>
-            hasOverlap(
-              range.startTime,
-              range.endTime,
-              request.start_time,
-              request.end_time,
+              row.start_time,
+              row.end_time,
             ),
           )
         : undefined;
 
-      const status = closedBlock
+      const status = occupiedSlot?.slot_status === "Closed"
         ? "closed"
-        : reservedRequest
+        : occupiedSlot?.slot_status === "Reserved"
           ? "reserved"
           : "available";
       const statusLabel =
         status === "closed" ? "Closed" : status === "reserved" ? "Reserved" : "Available";
-      const requester =
-        reservedRequest && hasCalendarRequester(reservedRequest)
-          ? reservedRequest.requester
-          : null;
+      const adminSlot = occupiedSlot as AdminCalendarAvailabilityRow | undefined;
 
       return {
         id: `${date}-${slot}`,
@@ -386,9 +314,9 @@ export function buildCalendarSlotSummaries(
         time: getSlotLabel(slot),
         status,
         statusLabel,
-        reservationRequesterName: requester?.full_name,
-        reservationRequesterUsername: requester?.username,
-        blockTitle: closedBlock?.title,
+        reservationRequesterName: adminSlot?.requester_full_name ?? undefined,
+        reservationRequesterUsername: adminSlot?.requester_username ?? undefined,
+        blockTitle: adminSlot?.block_title ?? undefined,
       };
     }),
   );
