@@ -6,6 +6,9 @@ reservations for the Yeditepe University Music Club.
 The system manages one rehearsal room. Admins create user accounts, and all
 users sign in with a username and password.
 
+This version supports basic reservation request creation, member cancellation
+of pending requests, and admin approval, rejection, and cancellation.
+
 ## Tech Stack
 
 - Next.js App Router
@@ -103,7 +106,54 @@ design does not include a separate rooms table. If the system is extended to
 support multiple rooms in the future, a rooms table and room relationship can be
 added.
 
-Future reservation tables are planned as:
+Reservation requests use predefined 1-hour slots between 10:00 and 18:00:
+10:00-11:00, 11:00-12:00, 12:00-13:00, 13:00-14:00, 14:00-15:00,
+15:00-16:00, 16:00-17:00, and 17:00-18:00. Pending requests do not block a
+slot. Approved reservations and calendar blocks do block a slot.
+
+The project expects these reservation tables:
+
+```sql
+create table public.reservation_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id),
+  start_time timestamp with time zone not null,
+  end_time timestamp with time zone not null,
+  purpose text not null,
+  participant_count integer not null,
+  equipment_needs text,
+  status text not null check (status in ('pending', 'approved', 'rejected', 'cancelled')),
+  admin_note text,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+create table public.reservation_status_history (
+  id uuid primary key default gen_random_uuid(),
+  reservation_request_id uuid not null references public.reservation_requests(id),
+  changed_by uuid not null references public.profiles(id),
+  old_status text check (old_status in ('pending', 'approved', 'rejected', 'cancelled')),
+  new_status text not null check (new_status in ('pending', 'approved', 'rejected', 'cancelled')),
+  note text,
+  created_at timestamp with time zone default now()
+);
+
+create table public.calendar_blocks (
+  id uuid primary key default gen_random_uuid(),
+  start_time timestamp with time zone not null,
+  end_time timestamp with time zone not null,
+  block_type text not null,
+  title text not null,
+  description text,
+  created_by uuid not null references public.profiles(id),
+  created_at timestamp with time zone default now()
+);
+```
+
+These tables intentionally do not include a separate room relationship in the
+current single-room scope.
+
+Reservation table fields:
 
 - `reservation_requests`: `id`, `user_id`, `start_time`, `end_time`, `purpose`,
   `participant_count`, `equipment_needs`, `status`, `admin_note`, `created_at`,

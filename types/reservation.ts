@@ -1,23 +1,27 @@
-export type CalendarSlotStatus =
-  | "available"
-  | "reserved"
-  | "pending"
-  | "closed";
+import type { Profile } from "@/types/profile";
+
+export type CalendarSlotStatus = "available" | "reserved" | "closed";
 
 export type CalendarSlotSummary = {
   id: string;
-  label: string;
   date: string;
+  slot: ReservationSlot;
   time: string;
   status: CalendarSlotStatus;
-  statusLabel: "Available" | "Reserved" | "Pending Requests" | "Closed";
+  statusLabel: "Available" | "Reserved" | "Closed";
 };
 
-export type ReservationRequestStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "cancelled";
+export type ReservationSlot =
+  | "10:00"
+  | "11:00"
+  | "12:00"
+  | "13:00"
+  | "14:00"
+  | "15:00"
+  | "16:00"
+  | "17:00";
+
+export type ReservationStatus = "pending" | "approved" | "rejected" | "cancelled";
 
 export type ReservationRequest = {
   id: string;
@@ -27,18 +31,31 @@ export type ReservationRequest = {
   purpose: string;
   participant_count: number;
   equipment_needs: string | null;
-  status: ReservationRequestStatus;
+  status: ReservationStatus;
   admin_note: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AdminReservationRequest = ReservationRequest & {
+  requester: Pick<
+    Profile,
+    | "id"
+    | "username"
+    | "full_name"
+    | "email"
+    | "phone"
+    | "student_number"
+    | "department"
+  > | null;
 };
 
 export type ReservationStatusHistory = {
   id: string;
   reservation_request_id: string;
   changed_by: string;
-  old_status: ReservationRequestStatus | null;
-  new_status: ReservationRequestStatus;
+  old_status: ReservationStatus | null;
+  new_status: ReservationStatus;
   note: string | null;
   created_at: string;
 };

@@ -1,13 +1,23 @@
 import { requireProfile } from "@/lib/auth/session";
-import { calendarSlotSummaries } from "@/lib/reservations";
+import { createClient } from "@/lib/supabase/server";
+import type { ReservationRequest } from "@/types/reservation";
 
 export default async function DashboardPage() {
-  const { profile } = await requireProfile();
-  const pendingCount = calendarSlotSummaries.filter(
-    (slot) => slot.status === "pending",
+  const { user, profile } = await requireProfile();
+  const supabase = await createClient();
+  let query = supabase.from("reservation_requests").select("status");
+
+  if (profile.role !== "admin") {
+    query = query.eq("user_id", user.id);
+  }
+
+  const { data } = await query;
+  const requests = (data ?? []) as Pick<ReservationRequest, "status">[];
+  const pendingCount = requests.filter(
+    (request) => request.status === "pending",
   ).length;
-  const reservedCount = calendarSlotSummaries.filter(
-    (slot) => slot.status === "reserved",
+  const approvedCount = requests.filter(
+    (request) => request.status === "approved",
   ).length;
 
   return (
@@ -23,29 +33,16 @@ export default async function DashboardPage() {
       </div>
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <MetricCard label="Pending requests" value={pendingCount} />
-        <MetricCard label="Reserved slots" value={reservedCount} />
+        <MetricCard label="Approved reservations" value={approvedCount} />
         <MetricCard label="Room count" value={1} />
       </div>
       <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-ink">Upcoming slot status</h2>
-        <div className="mt-4 divide-y divide-slate-100">
-          {calendarSlotSummaries.slice(0, 3).map((slot) => (
-            <div
-              key={slot.id}
-              className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div>
-                <p className="font-medium text-slate-900">{slot.label}</p>
-                <p className="text-sm text-slate-500">
-                  {slot.date} - {slot.time}
-                </p>
-              </div>
-              <span className="text-sm capitalize text-slate-600">
-                {slot.statusLabel}
-              </span>
-            </div>
-          ))}
-        </div>
+        <h2 className="text-lg font-semibold text-ink">Reservation workflow</h2>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Use Reservations to create requests and review their status. Use
+          Calendar to check anonymous availability for approved reservations and
+          closed slots.
+        </p>
       </div>
     </section>
   );
