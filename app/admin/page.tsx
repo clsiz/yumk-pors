@@ -1,11 +1,21 @@
 import { requireAdmin } from "@/lib/auth/session";
-import { calendarSlotSummaries } from "@/lib/reservations";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import type { ReservationRequest } from "@/types/reservation";
 
 export default async function AdminPage() {
   const { profile } = await requireAdmin();
-  const pendingSlots = calendarSlotSummaries.filter(
-    (slot) => slot.status === "pending",
-  );
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reservation_requests")
+    .select("status");
+  const requests = (data ?? []) as Pick<ReservationRequest, "status">[];
+  const pendingCount = requests.filter(
+    (request) => request.status === "pending",
+  ).length;
+  const approvedCount = requests.filter(
+    (request) => request.status === "approved",
+  ).length;
 
   return (
     <section className="mx-auto max-w-6xl px-6 py-10">
@@ -20,23 +30,17 @@ export default async function AdminPage() {
       </div>
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-ink">Pending requests</h2>
-          <div className="mt-4 space-y-4">
-            {pendingSlots.map((slot) => (
-              <div
-                key={slot.id}
-                className="rounded-md border border-slate-200 p-4"
-              >
-                <p className="font-medium text-slate-900">{slot.label}</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {slot.date} - {slot.time}
-                </p>
-                <p className="mt-3 text-sm text-slate-600">
-                  Approval actions will be added with reservation workflows.
-                </p>
-              </div>
-            ))}
+          <h2 className="text-lg font-semibold text-ink">Reservation queue</h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <Metric label="Pending requests" value={pendingCount} />
+            <Metric label="Approved reservations" value={approvedCount} />
           </div>
+          <Link
+            href="/reservations"
+            className="mt-5 inline-flex rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+          >
+            Manage requests
+          </Link>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-ink">User administration</h2>
@@ -52,5 +56,14 @@ export default async function AdminPage() {
         </div>
       </div>
     </section>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-slate-200 p-4">
+      <p className="text-sm font-medium text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
+    </div>
   );
 }
