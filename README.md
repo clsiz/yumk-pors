@@ -3,8 +3,8 @@
 YUMK-PORS is a graduation project web application for managing rehearsal room
 reservations for the Yeditepe University Music Club.
 
-The system manages one rehearsal room. There is no public signup; admins create
-users, and all users sign in with a username and password.
+The system manages one rehearsal room. Admins create user accounts, and all
+users sign in with a username and password.
 
 ## Tech Stack
 
@@ -93,8 +93,10 @@ with the same `auth.users.id`.
 
 ## Reservation Model
 
-The system is designed for one rehearsal room. Do not create a `rooms` table and
-do not add `room_id` to reservation-related tables.
+The current scope includes one rehearsal room. Therefore, the initial database
+design does not include a separate rooms table. If the system is extended to
+support multiple rooms in the future, a rooms table and room relationship can be
+added.
 
 Future reservation tables are planned as:
 
