@@ -4,19 +4,16 @@
 
 :root {
   color-scheme: light;
-}
-
-* {
-  box-sizing: border-box;
+  background: #f8fafc;
 }
 
 body {
   margin: 0;
   background: #f8fafc;
-  color: #111827;
+  color: #172033;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+button,
+input {
+  font: inherit;
 }
