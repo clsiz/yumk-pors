@@ -183,10 +183,22 @@ get_admin_calendar_availability(
 -- requester_full_name text
 -- requester_username text
 -- block_title text
+
+-- Anonymous pending request counts for calendar slots.
+get_calendar_pending_request_counts(
+  range_start timestamp with time zone,
+  range_end timestamp with time zone
+)
+
+-- Expected columns:
+-- start_time timestamp with time zone
+-- end_time timestamp with time zone
+-- pending_count integer
 ```
 
 The member RPC must never return requester names, usernames, phone numbers,
 student numbers, purpose, participant count, equipment needs, or admin notes.
+Pending counts are anonymous and may be shown to members for available slots.
 
 Reservation table fields:
 

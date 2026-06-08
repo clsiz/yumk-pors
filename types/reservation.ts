@@ -9,6 +9,7 @@ export type CalendarSlotSummary = {
   time: string;
   status: CalendarSlotStatus;
   statusLabel: "Available" | "Reserved" | "Closed";
+  pendingCount?: number;
   reservationRequesterName?: string;
   reservationRequesterUsername?: string;
   blockTitle?: string;
@@ -26,6 +27,12 @@ export type AdminCalendarAvailabilityRow = MemberCalendarAvailabilityRow & {
   requester_full_name?: string | null;
   requester_username?: string | null;
   block_title?: string | null;
+};
+
+export type CalendarPendingCountRow = {
+  start_time: string;
+  end_time: string;
+  pending_count: number;
 };
 
 export type ReservationSlot =

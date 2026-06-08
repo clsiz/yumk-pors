@@ -3,6 +3,7 @@ import type { Profile } from "@/types/profile";
 import type {
   AdminReservationRequest,
   AdminCalendarAvailabilityRow,
+  CalendarPendingCountRow,
   CalendarSlotSummary,
   MemberCalendarAvailabilityRow,
   ReservationRequest,
@@ -277,12 +278,30 @@ export async function fetchAdminCalendarAvailability(
   };
 }
 
+export async function fetchCalendarPendingRequestCounts(
+  supabase: SupabaseClient,
+  startTime: string,
+  endTime: string,
+) {
+  const { data, error } = await supabase
+    .rpc("get_calendar_pending_request_counts", {
+      range_start: startTime,
+      range_end: endTime,
+    });
+
+  return {
+    pendingCounts: (data ?? []) as CalendarPendingCountRow[],
+    error,
+  };
+}
+
 export function buildCalendarSlotSummaries(
   dates: string[],
   availabilityRows: (
     | MemberCalendarAvailabilityRow
     | AdminCalendarAvailabilityRow
   )[],
+  pendingCountRows: CalendarPendingCountRow[] = [],
 ) {
   return dates.map((date) =>
     RESERVATION_SLOTS.map((slot): CalendarSlotSummary => {
@@ -297,6 +316,18 @@ export function buildCalendarSlotSummaries(
             ),
           )
         : undefined;
+      const pendingCount = range
+        ? pendingCountRows
+            .filter((row) =>
+              hasOverlap(
+                range.startTime,
+                range.endTime,
+                row.start_time,
+                row.end_time,
+              ),
+            )
+            .reduce((total, row) => total + row.pending_count, 0)
+        : 0;
 
       const status = occupiedSlot?.slot_status === "Closed"
         ? "closed"
@@ -314,6 +345,7 @@ export function buildCalendarSlotSummaries(
         time: getSlotLabel(slot),
         status,
         statusLabel,
+        pendingCount,
         reservationRequesterName: adminSlot?.requester_full_name ?? undefined,
         reservationRequesterUsername: adminSlot?.requester_username ?? undefined,
         blockTitle: adminSlot?.block_title ?? undefined,
