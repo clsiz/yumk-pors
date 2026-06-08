@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { CalendarWeek } from "@/components/calendar-week";
 import { requireProfile } from "@/lib/auth/session";
 import {
   buildCalendarSlotSummaries,
   fetchAdminCalendarAvailability,
+  fetchCalendarPendingRequestCounts,
   fetchMemberCalendarAvailability,
   getCalendarDates,
   getReservationSlotRange,
@@ -10,10 +12,18 @@ import {
 } from "@/lib/reservations";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function CalendarPage() {
+type CalendarPageProps = {
+  searchParams?: Promise<{
+    notice?: string;
+    error?: string;
+  }>;
+};
+
+export default async function CalendarPage({ searchParams }: CalendarPageProps) {
   const { profile } = await requireProfile();
   const supabase = await createClient();
   const dates = getCalendarDates(7);
+  const params = searchParams ? await searchParams : {};
   const firstRange = getReservationSlotRange(dates[0], RESERVATION_SLOTS[0]);
   const lastRange = getReservationSlotRange(
     dates[dates.length - 1],
@@ -24,19 +34,38 @@ export default async function CalendarPage() {
       ? fetchAdminCalendarAvailability
       : fetchMemberCalendarAvailability;
 
-  const { availability, error: availabilityError } =
+  const [
+    { availability, error: availabilityError },
+    { pendingCounts, error: pendingCountsError },
+  ] =
     firstRange && lastRange
-      ? await fetchCalendarAvailability(
-          supabase,
-          firstRange.startTime,
-          lastRange.endTime,
-        )
-      : { availability: [], error: null };
+      ? await Promise.all([
+          fetchCalendarAvailability(
+            supabase,
+            firstRange.startTime,
+            lastRange.endTime,
+          ),
+          fetchCalendarPendingRequestCounts(
+            supabase,
+            firstRange.startTime,
+            lastRange.endTime,
+          ),
+        ])
+      : [
+          { availability: [], error: null },
+          { pendingCounts: [], error: null },
+        ];
 
-  const calendarDays = buildCalendarSlotSummaries(dates, availability);
-  const loadError = availabilityError
-    ? "Could not load calendar availability. Try again later."
-    : undefined;
+  const calendarDays = buildCalendarSlotSummaries(
+    dates,
+    availability,
+    pendingCounts,
+  );
+  const loadError =
+    params.error ||
+    (availabilityError || pendingCountsError
+      ? "Could not load calendar availability. Try again later."
+      : undefined);
 
   return (
     <section className="mx-auto max-w-6xl px-6 py-10">
@@ -56,99 +85,32 @@ export default async function CalendarPage() {
           </Link>
         ) : null}
       </div>
-      {loadError ? (
-        <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {loadError}
-        </div>
-      ) : null}
-      <div className="mt-8 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="grid grid-cols-1 divide-y divide-slate-100 md:grid-cols-7 md:divide-x md:divide-y-0">
-          {calendarDays.map((slots, index) => (
-            <div key={dates[index]} className="min-h-[28rem] p-4">
-              <p className="text-sm font-semibold text-slate-900">
-                {formatCalendarDate(dates[index])}
-              </p>
-              <div className="mt-4 space-y-3">
-                {slots.map((slot) => (
-                  <div
-                    key={slot.id}
-                    className="rounded-md border border-slate-200 p-3 text-sm"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-medium text-slate-700">
-                        {slot.time}
-                      </span>
-                      <CalendarStatusBadge status={slot.statusLabel} />
-                    </div>
-                    {profile.role === "admin" ? (
-                      <AdminSlotDetail
-                        blockTitle={slot.blockTitle}
-                        requesterName={slot.reservationRequesterName}
-                        requesterUsername={slot.reservationRequesterUsername}
-                        status={slot.statusLabel}
-                      />
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <StatusMessage error={loadError} notice={params.notice} />
+      <CalendarWeek calendarDays={calendarDays} dates={dates} role={profile.role} />
     </section>
   );
 }
 
-function AdminSlotDetail({
-  blockTitle,
-  requesterName,
-  requesterUsername,
-  status,
+function StatusMessage({
+  error,
+  notice,
 }: {
-  blockTitle?: string;
-  requesterName?: string;
-  requesterUsername?: string;
-  status: "Available" | "Reserved" | "Closed";
+  error?: string;
+  notice?: string;
 }) {
-  if (status === "Closed" && blockTitle) {
-    return <p className="mt-2 text-xs text-slate-500">{blockTitle}</p>;
+  if (!error && !notice) {
+    return null;
   }
-
-  if (status === "Reserved" && requesterName) {
-    return (
-      <p className="mt-2 text-xs text-slate-500">
-        {requesterName}
-        {requesterUsername ? ` (${requesterUsername})` : null}
-      </p>
-    );
-  }
-
-  return null;
-}
-
-function formatCalendarDate(date: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(`${date}T12:00:00`));
-}
-
-function CalendarStatusBadge({
-  status,
-}: {
-  status: "Available" | "Reserved" | "Closed";
-}) {
-  const colorClass =
-    status === "Available"
-      ? "bg-emerald-50 text-emerald-700"
-      : status === "Reserved"
-        ? "bg-amber-50 text-amber-700"
-        : "bg-slate-100 text-slate-700";
 
   return (
-    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${colorClass}`}>
-      {status}
-    </span>
+    <div
+      className={`mt-6 rounded-md border px-4 py-3 text-sm ${
+        error
+          ? "border-red-200 bg-red-50 text-red-700"
+          : "border-emerald-200 bg-emerald-50 text-emerald-700"
+      }`}
+    >
+      {error ?? notice}
+    </div>
   );
 }
