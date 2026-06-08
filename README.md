@@ -153,6 +153,41 @@ create table public.calendar_blocks (
 These tables intentionally do not include a separate room relationship in the
 current single-room scope.
 
+Calendar availability is exposed through privacy-safe Supabase RPC functions
+instead of giving members direct read access to other users' reservation rows.
+Keep `reservation_requests` private under RLS and use these functions for the
+calendar:
+
+```sql
+-- Member-facing availability. Returns anonymous occupied intervals only.
+get_member_calendar_availability(
+  range_start timestamp with time zone,
+  range_end timestamp with time zone
+)
+
+-- Expected columns:
+-- start_time timestamp with time zone
+-- end_time timestamp with time zone
+-- slot_status text -- "Reserved" or "Closed"
+
+-- Admin-facing availability. May include request/block display details.
+get_admin_calendar_availability(
+  range_start timestamp with time zone,
+  range_end timestamp with time zone
+)
+
+-- Expected columns:
+-- start_time timestamp with time zone
+-- end_time timestamp with time zone
+-- slot_status text -- "Reserved" or "Closed"
+-- requester_full_name text
+-- requester_username text
+-- block_title text
+```
+
+The member RPC must never return requester names, usernames, phone numbers,
+student numbers, purpose, participant count, equipment needs, or admin notes.
+
 Reservation table fields:
 
 - `reservation_requests`: `id`, `user_id`, `start_time`, `end_time`, `purpose`,

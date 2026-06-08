@@ -14,6 +14,20 @@ export type CalendarSlotSummary = {
   blockTitle?: string;
 };
 
+export type CalendarAvailabilityStatus = "Reserved" | "Closed";
+
+export type MemberCalendarAvailabilityRow = {
+  start_time: string;
+  end_time: string;
+  slot_status: CalendarAvailabilityStatus;
+};
+
+export type AdminCalendarAvailabilityRow = MemberCalendarAvailabilityRow & {
+  requester_full_name?: string | null;
+  requester_username?: string | null;
+  block_title?: string | null;
+};
+
 export type ReservationSlot =
   | "10:00"
   | "11:00"
@@ -51,10 +65,6 @@ export type AdminReservationRequest = ReservationRequest & {
     | "student_number"
     | "department"
   > | null;
-};
-
-export type AdminCalendarReservation = ReservationRequest & {
-  requester: Pick<Profile, "id" | "username" | "full_name"> | null;
 };
 
 export type ReservationStatusHistory = {

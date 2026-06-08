@@ -2,9 +2,8 @@ import Link from "next/link";
 import { requireProfile } from "@/lib/auth/session";
 import {
   buildCalendarSlotSummaries,
-  fetchApprovedReservationsForRange,
-  fetchApprovedReservationsWithRequesterForRange,
-  fetchCalendarBlocksForRange,
+  fetchAdminCalendarAvailability,
+  fetchMemberCalendarAvailability,
   getCalendarDates,
   getReservationSlotRange,
   RESERVATION_SLOTS,
@@ -20,35 +19,24 @@ export default async function CalendarPage() {
     dates[dates.length - 1],
     RESERVATION_SLOTS[RESERVATION_SLOTS.length - 1],
   );
-  const fetchApprovedReservations =
+  const fetchCalendarAvailability =
     profile.role === "admin"
-      ? fetchApprovedReservationsWithRequesterForRange
-      : fetchApprovedReservationsForRange;
+      ? fetchAdminCalendarAvailability
+      : fetchMemberCalendarAvailability;
 
-  const [{ requests, error: requestsError }, { blocks, error: blocksError }] =
+  const { availability, error: availabilityError } =
     firstRange && lastRange
-      ? await Promise.all([
-          fetchApprovedReservations(
-            supabase,
-            firstRange.startTime,
-            lastRange.endTime,
-          ),
-          fetchCalendarBlocksForRange(
-            supabase,
-            firstRange.startTime,
-            lastRange.endTime,
-          ),
-        ])
-      : [
-          { requests: [], error: null },
-          { blocks: [], error: null },
-        ];
+      ? await fetchCalendarAvailability(
+          supabase,
+          firstRange.startTime,
+          lastRange.endTime,
+        )
+      : { availability: [], error: null };
 
-  const calendarDays = buildCalendarSlotSummaries(dates, requests, blocks);
-  const loadError =
-    requestsError || blocksError
-      ? "Could not load calendar availability. Try again later."
-      : undefined;
+  const calendarDays = buildCalendarSlotSummaries(dates, availability);
+  const loadError = availabilityError
+    ? "Could not load calendar availability. Try again later."
+    : undefined;
 
   return (
     <section className="mx-auto max-w-6xl px-6 py-10">
