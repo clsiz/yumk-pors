@@ -1,31 +1,36 @@
-import type { Reservation } from "@/types/reservation";
+import type { CalendarSlotSummary } from "@/types/reservation";
 
-export const reservations: Reservation[] = [
+export const calendarSlotSummaries: CalendarSlotSummary[] = [
   {
-    id: "res-001",
-    band: "Monday Jazz Ensemble",
-    requestedBy: "Aylin Demir",
-    room: "Main rehearsal room",
-    date: "2026-06-01",
+    id: "slot-001",
+    label: "Evening rehearsal block",
+    date: "2026-06-10",
     time: "18:00 - 20:00",
-    status: "approved",
+    status: "reserved",
+    statusLabel: "Reserved",
   },
   {
-    id: "res-002",
-    band: "Acoustic Project",
-    requestedBy: "Can Arslan",
-    room: "Acoustic practice room",
-    date: "2026-06-02",
+    id: "slot-002",
+    label: "Afternoon rehearsal block",
+    date: "2026-06-11",
     time: "16:00 - 18:00",
     status: "pending",
+    statusLabel: "Pending Requests",
   },
   {
-    id: "res-003",
-    band: "Rock Workshop",
-    requestedBy: "Ece Kaya",
-    room: "Main rehearsal room",
-    date: "2026-06-04",
-    time: "19:00 - 21:00",
-    status: "approved",
+    id: "slot-003",
+    label: "Maintenance block",
+    date: "2026-06-12",
+    time: "12:00 - 14:00",
+    status: "closed",
+    statusLabel: "Closed",
+  },
+  {
+    id: "slot-004",
+    label: "Open rehearsal block",
+    date: "2026-06-13",
+    time: "14:00 - 16:00",
+    status: "available",
+    statusLabel: "Available",
   },
 ];

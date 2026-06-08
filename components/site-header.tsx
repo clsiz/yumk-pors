@@ -1,7 +1,12 @@
 import Link from "next/link";
-import { navigationItems } from "@/lib/navigation";
+import { logoutAction } from "@/app/login/actions";
+import { getAuthContext } from "@/lib/auth/session";
+import { getNavigationItems } from "@/lib/navigation";
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const { profile } = await getAuthContext();
+  const navigationItems = getNavigationItems(profile?.role ?? null);
+
   return (
     <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
       <nav className="mx-auto flex min-h-16 max-w-6xl flex-col gap-3 px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -18,6 +23,16 @@ export function SiteHeader() {
               {item.label}
             </Link>
           ))}
+          {profile ? (
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-ink"
+              >
+                Logout
+              </button>
+            </form>
+          ) : null}
         </div>
       </nav>
     </header>

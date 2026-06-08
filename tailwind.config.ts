@@ -8,9 +8,8 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#111827",
-        stage: "#7c2d12",
-        accent: "#047857",
+        ink: "#172033",
+        accent: "#0f766e",
       },
     },
   },
