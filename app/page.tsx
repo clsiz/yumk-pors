@@ -1,6 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getAuthContext } from "@/lib/auth/session";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const { profile } = await getAuthContext();
+
+  if (profile) {
+    redirect("/dashboard");
+  }
+
   return (
     <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-10 px-6 py-16 lg:grid-cols-[1.1fr_0.9fr]">
       <div>
@@ -12,7 +20,7 @@ export default function LandingPage() {
         </h1>
         <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
           A focused reservation and usage tracking system for the club rehearsal
-          rehearsal room, with member calendar access and admin-managed users.
+          room, with member calendar access and admin-managed users.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
