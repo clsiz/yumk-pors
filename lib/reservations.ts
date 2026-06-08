@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Profile } from "@/types/profile";
 import type {
+  AdminCalendarReservation,
   AdminReservationRequest,
   CalendarBlock,
   CalendarSlotSummary,
@@ -30,6 +31,8 @@ const calendarBlockColumns =
 
 const profileColumns =
   "id, username, full_name, email, phone, student_number, department";
+
+const calendarRequesterColumns = "id, username, full_name";
 
 export type SlotRange = {
   startTime: string;
@@ -87,7 +90,32 @@ export function hasOverlap(
   existingStart: string,
   existingEnd: string,
 ) {
-  return newStart < existingEnd && newEnd > existingStart;
+  const newStartTime = new Date(newStart).getTime();
+  const newEndTime = new Date(newEnd).getTime();
+  const existingStartTime = new Date(existingStart).getTime();
+  const existingEndTime = new Date(existingEnd).getTime();
+
+  if (
+    [
+      newStartTime,
+      newEndTime,
+      existingStartTime,
+      existingEndTime,
+    ].some(Number.isNaN)
+  ) {
+    return false;
+  }
+
+  // Strict overlap: 10:00-11:00 vs 11:00-12:00 is false,
+  // 11:00-12:00 vs 11:00-12:00 is true,
+  // and 12:00-13:00 vs 11:00-12:00 is false.
+  return newStartTime < existingEndTime && newEndTime > existingStartTime;
+}
+
+function hasCalendarRequester(
+  request: ReservationRequest | AdminCalendarReservation,
+): request is AdminCalendarReservation {
+  return "requester" in request;
 }
 
 export function formatReservationDateTime(value: string) {
@@ -244,6 +272,55 @@ export async function fetchApprovedReservationsForRange(
   };
 }
 
+export async function fetchApprovedReservationsWithRequesterForRange(
+  supabase: SupabaseClient,
+  startTime: string,
+  endTime: string,
+) {
+  const { data, error } = await supabase
+    .from("reservation_requests")
+    .select(reservationRequestColumns)
+    .eq("status", "approved")
+    .lt("start_time", endTime)
+    .gt("end_time", startTime);
+
+  if (error || !data?.length) {
+    return {
+      requests: (data ?? []) as AdminCalendarReservation[],
+      error,
+    };
+  }
+
+  const requests = data as ReservationRequest[];
+  const userIds = Array.from(new Set(requests.map((request) => request.user_id)));
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select(calendarRequesterColumns)
+    .in("id", userIds);
+
+  if (profilesError) {
+    return {
+      requests: [],
+      error: profilesError,
+    };
+  }
+
+  const profilesById = new Map(
+    ((profiles ?? []) as Pick<
+      Profile,
+      "id" | "username" | "full_name"
+    >[]).map((profile) => [profile.id, profile]),
+  );
+
+  return {
+    requests: requests.map((request) => ({
+      ...request,
+      requester: profilesById.get(request.user_id) ?? null,
+    })),
+    error: null,
+  };
+}
+
 export async function fetchCalendarBlocksForRange(
   supabase: SupabaseClient,
   startTime: string,
@@ -263,19 +340,24 @@ export async function fetchCalendarBlocksForRange(
 
 export function buildCalendarSlotSummaries(
   dates: string[],
-  approvedReservations: ReservationRequest[],
+  approvedReservations: (ReservationRequest | AdminCalendarReservation)[],
   calendarBlocks: CalendarBlock[],
 ) {
   return dates.map((date) =>
     RESERVATION_SLOTS.map((slot): CalendarSlotSummary => {
       const range = getReservationSlotRange(date, slot);
-      const isClosed = range
-        ? calendarBlocks.some((block) =>
-            hasOverlap(range.startTime, range.endTime, block.start_time, block.end_time),
+      const closedBlock = range
+        ? calendarBlocks.find((block) =>
+            hasOverlap(
+              range.startTime,
+              range.endTime,
+              block.start_time,
+              block.end_time,
+            ),
           )
-        : false;
-      const isReserved = range
-        ? approvedReservations.some((request) =>
+        : undefined;
+      const reservedRequest = range
+        ? approvedReservations.find((request) =>
             hasOverlap(
               range.startTime,
               range.endTime,
@@ -283,11 +365,19 @@ export function buildCalendarSlotSummaries(
               request.end_time,
             ),
           )
-        : false;
+        : undefined;
 
-      const status = isClosed ? "closed" : isReserved ? "reserved" : "available";
+      const status = closedBlock
+        ? "closed"
+        : reservedRequest
+          ? "reserved"
+          : "available";
       const statusLabel =
         status === "closed" ? "Closed" : status === "reserved" ? "Reserved" : "Available";
+      const requester =
+        reservedRequest && hasCalendarRequester(reservedRequest)
+          ? reservedRequest.requester
+          : null;
 
       return {
         id: `${date}-${slot}`,
@@ -296,6 +386,9 @@ export function buildCalendarSlotSummaries(
         time: getSlotLabel(slot),
         status,
         statusLabel,
+        reservationRequesterName: requester?.full_name,
+        reservationRequesterUsername: requester?.username,
+        blockTitle: closedBlock?.title,
       };
     }),
   );

@@ -3,6 +3,7 @@ import { requireProfile } from "@/lib/auth/session";
 import {
   buildCalendarSlotSummaries,
   fetchApprovedReservationsForRange,
+  fetchApprovedReservationsWithRequesterForRange,
   fetchCalendarBlocksForRange,
   getCalendarDates,
   getReservationSlotRange,
@@ -19,11 +20,15 @@ export default async function CalendarPage() {
     dates[dates.length - 1],
     RESERVATION_SLOTS[RESERVATION_SLOTS.length - 1],
   );
+  const fetchApprovedReservations =
+    profile.role === "admin"
+      ? fetchApprovedReservationsWithRequesterForRange
+      : fetchApprovedReservationsForRange;
 
   const [{ requests, error: requestsError }, { blocks, error: blocksError }] =
     firstRange && lastRange
       ? await Promise.all([
-          fetchApprovedReservationsForRange(
+          fetchApprovedReservations(
             supabase,
             firstRange.startTime,
             lastRange.endTime,
@@ -87,6 +92,14 @@ export default async function CalendarPage() {
                       </span>
                       <CalendarStatusBadge status={slot.statusLabel} />
                     </div>
+                    {profile.role === "admin" ? (
+                      <AdminSlotDetail
+                        blockTitle={slot.blockTitle}
+                        requesterName={slot.reservationRequesterName}
+                        requesterUsername={slot.reservationRequesterUsername}
+                        status={slot.statusLabel}
+                      />
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -96,6 +109,33 @@ export default async function CalendarPage() {
       </div>
     </section>
   );
+}
+
+function AdminSlotDetail({
+  blockTitle,
+  requesterName,
+  requesterUsername,
+  status,
+}: {
+  blockTitle?: string;
+  requesterName?: string;
+  requesterUsername?: string;
+  status: "Available" | "Reserved" | "Closed";
+}) {
+  if (status === "Closed" && blockTitle) {
+    return <p className="mt-2 text-xs text-slate-500">{blockTitle}</p>;
+  }
+
+  if (status === "Reserved" && requesterName) {
+    return (
+      <p className="mt-2 text-xs text-slate-500">
+        {requesterName}
+        {requesterUsername ? ` (${requesterUsername})` : null}
+      </p>
+    );
+  }
+
+  return null;
 }
 
 function formatCalendarDate(date: string) {
