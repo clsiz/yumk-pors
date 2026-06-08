@@ -6,8 +6,9 @@ reservations for the Yeditepe University Music Club.
 The system manages one rehearsal room. Admins create user accounts, and all
 users sign in with a username and password.
 
-This version supports basic reservation request creation, member cancellation
-of pending requests, and admin approval, rejection, and cancellation.
+This version supports calendar-based reservation request creation, member
+cancellation of pending requests, and admin approval, rejection, and
+cancellation.
 
 ## Tech Stack
 
@@ -54,8 +55,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - `/` landing page
 - `/login` username login page
 - `/dashboard` authenticated dashboard
-- `/reservations` authenticated reservation status page
-- `/calendar` authenticated calendar page
+- `/reservations` authenticated reservation tracking and audit page
+- `/calendar` authenticated calendar and slot request page
 - `/admin` admin-only page
 
 ## Authentication
@@ -110,6 +111,12 @@ Reservation requests use predefined 1-hour slots between 10:00 and 18:00:
 10:00-11:00, 11:00-12:00, 12:00-13:00, 13:00-14:00, 14:00-15:00,
 15:00-16:00, 16:00-17:00, and 17:00-18:00. Pending requests do not block a
 slot. Approved reservations and calendar blocks do block a slot.
+
+The calendar is the primary member request creation surface. Members request a
+new rehearsal slot by choosing an available time from `/calendar`, then track
+their own requests from `/reservations`. Admins can inspect slot-specific
+pending and approved reservations from the calendar, while `/reservations`
+remains the full request management and audit page.
 
 The project expects these reservation tables:
 
@@ -199,6 +206,153 @@ get_calendar_pending_request_counts(
 The member RPC must never return requester names, usernames, phone numbers,
 student numbers, purpose, participant count, equipment needs, or admin notes.
 Pending counts are anonymous and may be shown to members for available slots.
+
+Admin approval uses a database RPC so approving one request and automatically
+rejecting overlapping pending requests is one atomic business operation:
+
+```sql
+approve_reservation_request_with_auto_reject(
+  request_id uuid,
+  admin_note text
+)
+
+-- Expected success columns:
+-- approved_request_id uuid
+-- auto_rejected_count integer
+```
+
+The function should verify `public.is_admin()`, load the selected pending
+request, re-check approved reservation and calendar block conflicts, approve
+the selected request, reject only other pending requests where
+`other.start_time < approved.end_time and other.end_time > approved.start_time`,
+and insert `reservation_status_history` rows for the approval and every
+automatic rejection. Automatic rejections should use this note:
+
+```text
+Automatically rejected because another request was approved for this time slot.
+```
+
+The function should raise clear errors that the application can show after
+redirecting back to `/calendar` or `/reservations`, including:
+
+- `User is not an admin.`
+- `Request not found or not pending.`
+- `This slot is already reserved.`
+- `This slot is blocked.`
+
+Example setup SQL:
+
+```sql
+create or replace function public.approve_reservation_request_with_auto_reject(
+  request_id uuid,
+  admin_note text default null
+)
+returns table (
+  approved_request_id uuid,
+  auto_rejected_count integer
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  selected_request public.reservation_requests%rowtype;
+  auto_reject_note text :=
+    'Automatically rejected because another request was approved for this time slot.';
+begin
+  if not public.is_admin() then
+    raise exception 'User is not an admin.';
+  end if;
+
+  select *
+    into selected_request
+    from public.reservation_requests
+   where id = $1
+     and status = 'pending'
+   for update;
+
+  if not found then
+    raise exception 'Request not found or not pending.';
+  end if;
+
+  if exists (
+    select 1
+      from public.reservation_requests existing
+     where existing.status = 'approved'
+       and existing.id <> selected_request.id
+       and existing.start_time < selected_request.end_time
+       and existing.end_time > selected_request.start_time
+  ) then
+    raise exception 'This slot is already reserved.';
+  end if;
+
+  if exists (
+    select 1
+      from public.calendar_blocks calendar_block
+     where calendar_block.start_time < selected_request.end_time
+       and calendar_block.end_time > selected_request.start_time
+  ) then
+    raise exception 'This slot is blocked.';
+  end if;
+
+  update public.reservation_requests
+     set status = 'approved',
+         admin_note = $2,
+         updated_at = now()
+   where id = selected_request.id;
+
+  insert into public.reservation_status_history (
+    reservation_request_id,
+    changed_by,
+    old_status,
+    new_status,
+    note
+  )
+  values (
+    selected_request.id,
+    auth.uid(),
+    'pending',
+    'approved',
+    $2
+  );
+
+  with rejected as (
+    update public.reservation_requests other
+       set status = 'rejected',
+           admin_note = auto_reject_note,
+           updated_at = now()
+     where other.status = 'pending'
+       and other.id <> selected_request.id
+       and other.start_time < selected_request.end_time
+       and other.end_time > selected_request.start_time
+     returning other.id
+  ),
+  history as (
+    insert into public.reservation_status_history (
+      reservation_request_id,
+      changed_by,
+      old_status,
+      new_status,
+      note
+    )
+    select
+      rejected.id,
+      auth.uid(),
+      'pending',
+      'rejected',
+      auto_reject_note
+      from rejected
+    returning reservation_request_id
+  )
+  select count(*)::integer
+    into auto_rejected_count
+    from history;
+
+  approved_request_id := selected_request.id;
+  return next;
+end;
+$$;
+```
 
 Reservation table fields:
 

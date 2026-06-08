@@ -10,18 +10,32 @@ import {
   isOneHourRange,
 } from "@/lib/reservations";
 import { createClient } from "@/lib/supabase/server";
-import type { ReservationRequest, ReservationStatus } from "@/types/reservation";
+import type {
+  ApproveReservationRpcResult,
+  ReservationRequest,
+  ReservationStatus,
+} from "@/types/reservation";
 
 const requestColumns =
   "id, user_id, start_time, end_time, purpose, participant_count, equipment_needs, status, admin_note, created_at, updated_at";
 
-function redirectWithMessage(type: "notice" | "error", message: string): never {
+function redirectWithMessage(
+  type: "notice" | "error",
+  message: string,
+  redirectPath = "/reservations",
+): never {
   const params = new URLSearchParams({ [type]: message });
-  redirect(`/reservations?${params.toString()}`);
+  redirect(`${redirectPath}?${params.toString()}`);
 }
 
 function getStringValue(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
+}
+
+function getRedirectPath(formData: FormData) {
+  const redirectTo = getStringValue(formData, "redirect_to");
+
+  return redirectTo === "/calendar" ? "/calendar" : "/reservations";
 }
 
 function parseParticipantCount(value: string) {
@@ -72,6 +86,34 @@ async function insertStatusHistory({
     new_status: newStatus,
     note,
   });
+}
+
+function getApprovalResult(
+  data: ApproveReservationRpcResult | ApproveReservationRpcResult[] | null,
+) {
+  return Array.isArray(data) ? data[0] : data;
+}
+
+function getApprovalErrorMessage(errorMessage?: string) {
+  const normalized = errorMessage?.toLowerCase() ?? "";
+
+  if (normalized.includes("not an admin")) {
+    return "User is not an admin.";
+  }
+
+  if (normalized.includes("not found") || normalized.includes("not pending")) {
+    return "Request not found or not pending.";
+  }
+
+  if (normalized.includes("already reserved")) {
+    return "This slot is already reserved.";
+  }
+
+  if (normalized.includes("blocked")) {
+    return "This slot is blocked.";
+  }
+
+  return "Could not approve the request. Try again.";
 }
 
 export async function createReservationRequestAction(formData: FormData) {
@@ -197,79 +239,55 @@ export async function cancelOwnPendingRequestAction(formData: FormData) {
   }
 
   revalidatePath("/reservations");
+  revalidatePath("/calendar");
   redirectWithMessage("notice", "Reservation request cancelled.");
 }
 
 export async function approveReservationRequestAction(formData: FormData) {
-  const { user } = await requireAdmin();
+  await requireAdmin();
   const supabase = await createClient();
   const requestId = getStringValue(formData, "request_id");
-  const { request, error: fetchError } = await getReservationRequest(requestId);
+  const adminNote = getStringValue(formData, "admin_note");
+  const redirectPath = getRedirectPath(formData);
 
-  if (fetchError || !request) {
-    redirectWithMessage("error", "Reservation request was not found.");
+  if (!requestId) {
+    redirectWithMessage("error", "Reservation request was not found.", redirectPath);
   }
 
-  if (request.status !== "pending") {
-    redirectWithMessage("error", "Only pending requests can be approved.");
-  }
-
-  const approvedConflict = await hasApprovedReservationConflict(
-    supabase,
-    request.start_time,
-    request.end_time,
+  const { data, error } = await supabase.rpc(
+    "approve_reservation_request_with_auto_reject",
+    {
+      request_id: requestId,
+      admin_note: adminNote || null,
+    },
   );
-
-  if (approvedConflict.error) {
-    redirectWithMessage("error", "Could not check approved reservations. Try again.");
-  }
-
-  if (approvedConflict.hasConflict) {
-    redirectWithMessage("error", "This request conflicts with an approved reservation.");
-  }
-
-  const blockConflict = await hasCalendarBlockConflict(
-    supabase,
-    request.start_time,
-    request.end_time,
-  );
-
-  if (blockConflict.error) {
-    redirectWithMessage("error", "Could not check calendar blocks. Try again.");
-  }
-
-  if (blockConflict.hasConflict) {
-    redirectWithMessage("error", "This request conflicts with a calendar block.");
-  }
-
-  const { error } = await supabase
-    .from("reservation_requests")
-    .update({
-      status: "approved",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", request.id)
-    .eq("status", "pending");
 
   if (error) {
-    redirectWithMessage("error", "Could not approve the request. Try again.");
+    redirectWithMessage(
+      "error",
+      getApprovalErrorMessage(error.message),
+      redirectPath,
+    );
   }
 
-  const { error: historyError } = await insertStatusHistory({
-    requestId: request.id,
-    changedBy: user.id,
-    oldStatus: request.status,
-    newStatus: "approved",
-    note: null,
-  });
-
-  if (historyError) {
-    redirectWithMessage("error", "Request was approved, but status history could not be saved.");
-  }
+  const result = getApprovalResult(data as ApproveReservationRpcResult[] | null);
+  const autoRejectedCount = result?.auto_rejected_count ?? 0;
+  const autoRejectedMessage =
+    autoRejectedCount > 0
+      ? ` ${autoRejectedCount} overlapping pending ${
+          autoRejectedCount === 1 ? "request was" : "requests were"
+        } automatically rejected.`
+      : "";
 
   revalidatePath("/reservations");
   revalidatePath("/calendar");
-  redirectWithMessage("notice", "Reservation request approved.");
+  revalidatePath("/dashboard");
+  revalidatePath("/admin");
+  redirectWithMessage(
+    "notice",
+    `Reservation request approved.${autoRejectedMessage}`,
+    redirectPath,
+  );
 }
 
 export async function rejectReservationRequestAction(formData: FormData) {
@@ -277,14 +295,15 @@ export async function rejectReservationRequestAction(formData: FormData) {
   const supabase = await createClient();
   const requestId = getStringValue(formData, "request_id");
   const adminNote = getStringValue(formData, "admin_note");
+  const redirectPath = getRedirectPath(formData);
   const { request, error: fetchError } = await getReservationRequest(requestId);
 
   if (fetchError || !request) {
-    redirectWithMessage("error", "Reservation request was not found.");
+    redirectWithMessage("error", "Reservation request was not found.", redirectPath);
   }
 
   if (request.status !== "pending") {
-    redirectWithMessage("error", "Only pending requests can be rejected.");
+    redirectWithMessage("error", "Only pending requests can be rejected.", redirectPath);
   }
 
   const { error } = await supabase
@@ -298,7 +317,7 @@ export async function rejectReservationRequestAction(formData: FormData) {
     .eq("status", "pending");
 
   if (error) {
-    redirectWithMessage("error", "Could not reject the request. Try again.");
+    redirectWithMessage("error", "Could not reject the request. Try again.", redirectPath);
   }
 
   const { error: historyError } = await insertStatusHistory({
@@ -310,11 +329,18 @@ export async function rejectReservationRequestAction(formData: FormData) {
   });
 
   if (historyError) {
-    redirectWithMessage("error", "Request was rejected, but status history could not be saved.");
+    redirectWithMessage(
+      "error",
+      "Request was rejected, but status history could not be saved.",
+      redirectPath,
+    );
   }
 
   revalidatePath("/reservations");
-  redirectWithMessage("notice", "Reservation request rejected.");
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+  revalidatePath("/admin");
+  redirectWithMessage("notice", "Reservation request rejected.", redirectPath);
 }
 
 export async function cancelApprovedReservationAction(formData: FormData) {
@@ -322,14 +348,19 @@ export async function cancelApprovedReservationAction(formData: FormData) {
   const supabase = await createClient();
   const requestId = getStringValue(formData, "request_id");
   const adminNote = getStringValue(formData, "admin_note");
+  const redirectPath = getRedirectPath(formData);
   const { request, error: fetchError } = await getReservationRequest(requestId);
 
   if (fetchError || !request) {
-    redirectWithMessage("error", "Reservation request was not found.");
+    redirectWithMessage("error", "Reservation request was not found.", redirectPath);
   }
 
   if (request.status !== "approved") {
-    redirectWithMessage("error", "Only approved reservations can be cancelled by an admin.");
+    redirectWithMessage(
+      "error",
+      "Only approved reservations can be cancelled by an admin.",
+      redirectPath,
+    );
   }
 
   const { error } = await supabase
@@ -343,7 +374,11 @@ export async function cancelApprovedReservationAction(formData: FormData) {
     .eq("status", "approved");
 
   if (error) {
-    redirectWithMessage("error", "Could not cancel the reservation. Try again.");
+    redirectWithMessage(
+      "error",
+      "Could not cancel the reservation. Try again.",
+      redirectPath,
+    );
   }
 
   const { error: historyError } = await insertStatusHistory({
@@ -355,10 +390,16 @@ export async function cancelApprovedReservationAction(formData: FormData) {
   });
 
   if (historyError) {
-    redirectWithMessage("error", "Reservation was cancelled, but status history could not be saved.");
+    redirectWithMessage(
+      "error",
+      "Reservation was cancelled, but status history could not be saved.",
+      redirectPath,
+    );
   }
 
   revalidatePath("/reservations");
   revalidatePath("/calendar");
-  redirectWithMessage("notice", "Reservation cancelled.");
+  revalidatePath("/dashboard");
+  revalidatePath("/admin");
+  redirectWithMessage("notice", "Reservation cancelled.", redirectPath);
 }

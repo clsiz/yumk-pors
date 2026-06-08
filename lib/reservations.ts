@@ -3,6 +3,7 @@ import type { Profile } from "@/types/profile";
 import type {
   AdminReservationRequest,
   AdminCalendarAvailabilityRow,
+  CalendarBlock,
   CalendarPendingCountRow,
   CalendarSlotSummary,
   MemberCalendarAvailabilityRow,
@@ -29,6 +30,9 @@ const reservationRequestColumns =
 
 const profileColumns =
   "id, username, full_name, email, phone, student_number, department";
+
+const calendarBlockColumns =
+  "id, start_time, end_time, block_type, title, description, created_by, created_at";
 
 export type SlotRange = {
   startTime: string;
@@ -217,7 +221,13 @@ export async function fetchAdminReservationRequests(supabase: SupabaseClient) {
     };
   }
 
-  const requests = data as ReservationRequest[];
+  return attachRequesterProfiles(supabase, data as ReservationRequest[]);
+}
+
+async function attachRequesterProfiles(
+  supabase: SupabaseClient,
+  requests: ReservationRequest[],
+) {
   const userIds = Array.from(new Set(requests.map((request) => request.user_id)));
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
@@ -241,6 +251,47 @@ export async function fetchAdminReservationRequests(supabase: SupabaseClient) {
       requester: profilesById.get(request.user_id) ?? null,
     })),
     error: null,
+  };
+}
+
+export async function fetchAdminCalendarRequestsForRange(
+  supabase: SupabaseClient,
+  startTime: string,
+  endTime: string,
+) {
+  const { data, error } = await supabase
+    .from("reservation_requests")
+    .select(reservationRequestColumns)
+    .in("status", ["pending", "approved"])
+    .lt("start_time", endTime)
+    .gt("end_time", startTime)
+    .order("start_time", { ascending: true });
+
+  if (error || !data?.length) {
+    return {
+      requests: (data ?? []) as AdminReservationRequest[],
+      error,
+    };
+  }
+
+  return attachRequesterProfiles(supabase, data as ReservationRequest[]);
+}
+
+export async function fetchAdminCalendarBlocksForRange(
+  supabase: SupabaseClient,
+  startTime: string,
+  endTime: string,
+) {
+  const { data, error } = await supabase
+    .from("calendar_blocks")
+    .select(calendarBlockColumns)
+    .lt("start_time", endTime)
+    .gt("end_time", startTime)
+    .order("start_time", { ascending: true });
+
+  return {
+    blocks: (data ?? []) as CalendarBlock[],
+    error,
   };
 }
 
@@ -302,6 +353,10 @@ export function buildCalendarSlotSummaries(
     | AdminCalendarAvailabilityRow
   )[],
   pendingCountRows: CalendarPendingCountRow[] = [],
+  options: {
+    adminRequests?: AdminReservationRequest[];
+    adminBlocks?: CalendarBlock[];
+  } = {},
 ) {
   return dates.map((date) =>
     RESERVATION_SLOTS.map((slot): CalendarSlotSummary => {
@@ -328,6 +383,40 @@ export function buildCalendarSlotSummaries(
             )
             .reduce((total, row) => total + row.pending_count, 0)
         : 0;
+      const pendingRequests = range
+        ? options.adminRequests?.filter(
+            (request) =>
+              request.status === "pending" &&
+              hasOverlap(
+                range.startTime,
+                range.endTime,
+                request.start_time,
+                request.end_time,
+              ),
+          )
+        : undefined;
+      const approvedRequest = range
+        ? options.adminRequests?.find(
+            (request) =>
+              request.status === "approved" &&
+              hasOverlap(
+                range.startTime,
+                range.endTime,
+                request.start_time,
+                request.end_time,
+              ),
+          )
+        : undefined;
+      const block = range
+        ? options.adminBlocks?.find((calendarBlock) =>
+            hasOverlap(
+              range.startTime,
+              range.endTime,
+              calendarBlock.start_time,
+              calendarBlock.end_time,
+            ),
+          )
+        : undefined;
 
       const status = occupiedSlot?.slot_status === "Closed"
         ? "closed"
@@ -346,9 +435,18 @@ export function buildCalendarSlotSummaries(
         status,
         statusLabel,
         pendingCount,
-        reservationRequesterName: adminSlot?.requester_full_name ?? undefined,
-        reservationRequesterUsername: adminSlot?.requester_username ?? undefined,
-        blockTitle: adminSlot?.block_title ?? undefined,
+        reservationRequesterName:
+          approvedRequest?.requester?.full_name ??
+          adminSlot?.requester_full_name ??
+          undefined,
+        reservationRequesterUsername:
+          approvedRequest?.requester?.username ??
+          adminSlot?.requester_username ??
+          undefined,
+        blockTitle: block?.title ?? adminSlot?.block_title ?? undefined,
+        pendingRequests: pendingRequests?.length ? pendingRequests : undefined,
+        approvedRequest,
+        block,
       };
     }),
   );

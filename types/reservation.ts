@@ -13,6 +13,9 @@ export type CalendarSlotSummary = {
   reservationRequesterName?: string;
   reservationRequesterUsername?: string;
   blockTitle?: string;
+  pendingRequests?: AdminReservationRequest[];
+  approvedRequest?: AdminReservationRequest;
+  block?: CalendarBlock;
 };
 
 export type CalendarAvailabilityStatus = "Reserved" | "Closed";
@@ -72,6 +75,11 @@ export type AdminReservationRequest = ReservationRequest & {
     | "student_number"
     | "department"
   > | null;
+};
+
+export type ApproveReservationRpcResult = {
+  approved_request_id: string;
+  auto_rejected_count: number;
 };
 
 export type ReservationStatusHistory = {
