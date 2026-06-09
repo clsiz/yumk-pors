@@ -3,6 +3,7 @@ import { CalendarWeek } from "@/components/calendar-week";
 import { requireProfile } from "@/lib/auth/session";
 import {
   buildCalendarSlotSummaries,
+  CALENDAR_RANGE_DAYS,
   fetchAdminCalendarBlocksForRange,
   fetchAdminCalendarRequestsForRange,
   fetchAdminCalendarAvailability,
@@ -10,8 +11,11 @@ import {
   fetchMemberCalendarBlockDetails,
   fetchMemberCalendarAvailability,
   getCalendarDates,
+  getLocalDateString,
   getReservationSlotRange,
+  isLocalDateString,
   RESERVATION_SLOTS,
+  shiftLocalDate,
 } from "@/lib/reservations";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,14 +23,21 @@ type CalendarPageProps = {
   searchParams?: Promise<{
     notice?: string;
     error?: string;
+    start?: string;
   }>;
 };
 
 export default async function CalendarPage({ searchParams }: CalendarPageProps) {
   const { profile } = await requireProfile();
   const supabase = await createClient();
-  const dates = getCalendarDates(7);
   const params = searchParams ? await searchParams : {};
+  const today = getLocalDateString(new Date());
+  const startDate = params.start && isLocalDateString(params.start)
+    ? params.start
+    : today;
+  const dates = getCalendarDates(CALENDAR_RANGE_DAYS, startDate);
+  const previousStartDate = shiftLocalDate(startDate, -CALENDAR_RANGE_DAYS);
+  const nextStartDate = shiftLocalDate(startDate, CALENDAR_RANGE_DAYS);
   const firstRange = getReservationSlotRange(dates[0], RESERVATION_SLOTS[0]);
   const lastRange = getReservationSlotRange(
     dates[dates.length - 1],
@@ -109,21 +120,49 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
         <div>
           <h1 className="text-3xl font-bold text-ink">Calendar</h1>
           <p className="mt-2 text-slate-600">
-            Weekly availability for the single rehearsal room.
+            30-day availability for the single rehearsal room.
           </p>
         </div>
-        {profile.role === "admin" ? (
-          <Link
-            href="/reservations"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
-          >
-            Manage requests
-          </Link>
-        ) : null}
+        <div className="flex flex-col gap-3 sm:items-end">
+          {profile.role === "admin" ? (
+            <Link
+              href="/reservations"
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+            >
+              Manage requests
+            </Link>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <CalendarRangeLink href={`/calendar?start=${previousStartDate}`}>
+              Previous 30 days
+            </CalendarRangeLink>
+            <CalendarRangeLink href="/calendar">Today</CalendarRangeLink>
+            <CalendarRangeLink href={`/calendar?start=${nextStartDate}`}>
+              Next 30 days
+            </CalendarRangeLink>
+          </div>
+        </div>
       </div>
       <StatusMessage error={loadError} notice={params.notice} />
       <CalendarWeek calendarDays={calendarDays} dates={dates} role={profile.role} />
     </section>
+  );
+}
+
+function CalendarRangeLink({
+  children,
+  href,
+}: {
+  children: React.ReactNode;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+    >
+      {children}
+    </Link>
   );
 }
 

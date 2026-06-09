@@ -7,6 +7,7 @@ export type CalendarSlotSummary = {
   date: string;
   slot: ReservationSlot;
   time: string;
+  isPast: boolean;
   status: CalendarSlotStatus;
   statusLabel: "Available" | "Reserved" | "Closed";
   pendingCount?: number;
@@ -63,8 +64,7 @@ export type ReservationRequest = {
   user_id: string;
   start_time: string;
   end_time: string;
-  purpose: string;
-  participant_count: number;
+  group_members_details: string;
   equipment_needs: string | null;
   status: ReservationStatus;
   admin_note: string | null;

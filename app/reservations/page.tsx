@@ -163,10 +163,9 @@ function MemberRequestList({ requests }: { requests: ReservationRequest[] }) {
                 <StatusBadge status={request.status} />
               </div>
               <dl className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-                <Detail label="Purpose" value={request.purpose} />
                 <Detail
-                  label="Participants"
-                  value={String(request.participant_count)}
+                  label="Group members"
+                  value={request.group_members_details}
                 />
                 <Detail
                   label="Equipment"
@@ -299,10 +298,9 @@ function AdminRequestSection({
                 label="End"
                 value={formatReservationDateTime(request.end_time)}
               />
-              <Detail label="Purpose" value={request.purpose} />
               <Detail
-                label="Participants"
-                value={String(request.participant_count)}
+                label="Group members"
+                value={request.group_members_details}
               />
               <Detail
                 label="Equipment"

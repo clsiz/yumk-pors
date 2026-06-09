@@ -11,7 +11,7 @@ import type { Announcement } from "@/types/announcement";
 import type { ReservationRequest } from "@/types/reservation";
 
 const requestColumns =
-  "id, user_id, start_time, end_time, purpose, participant_count, equipment_needs, status, admin_note, created_at, updated_at";
+  "id, user_id, start_time, end_time, group_members_details, equipment_needs, status, admin_note, created_at, updated_at";
 
 export default async function DashboardPage() {
   const { user, profile } = await requireProfile();
@@ -177,7 +177,9 @@ function DashboardRequestSection({
                   request.end_time,
                 )}
               </p>
-              <p className="mt-2 text-sm text-slate-600">{request.purpose}</p>
+              <p className="mt-2 line-clamp-2 text-sm text-slate-600">
+                {request.group_members_details}
+              </p>
               <p className="mt-2 text-xs font-medium text-slate-500">
                 {formatSubmittedDateTime(request.created_at)}
               </p>
