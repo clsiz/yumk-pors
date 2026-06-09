@@ -12,6 +12,7 @@ import {
   cancelApprovedReservationAction,
   rejectReservationRequestAction,
 } from "@/app/reservations/actions";
+import { RESERVATION_EQUIPMENT_OPTIONS } from "@/lib/reservations";
 import type { UserRole } from "@/types/profile";
 import type {
   AdminReservationRequest,
@@ -43,7 +44,7 @@ export function CalendarWeek({ calendarDays, dates, role }: CalendarWeekProps) {
     <>
       <div className="mt-8 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <div className="grid min-w-[88rem] grid-cols-7 divide-x divide-slate-100">
+          <div className="grid min-w-[390rem] grid-cols-[repeat(30,minmax(13rem,1fr))] divide-x divide-slate-100">
             {calendarDays.map((slots, index) => (
               <div key={dates[index]} className="min-w-[13rem] p-4">
                 <div className="flex items-center justify-between gap-2">
@@ -64,7 +65,7 @@ export function CalendarWeek({ calendarDays, dates, role }: CalendarWeekProps) {
                 <div className="mt-4 space-y-3">
                   {slots.map((slot) => {
                     const isClickable =
-                      (isMember && slot.status === "available") ||
+                      (isMember && slot.status === "available" && !slot.isPast) ||
                       (isAdmin && isAdminClickableSlot(slot));
 
                     return (
@@ -191,37 +192,58 @@ function RequestSlotModal({
         <input type="hidden" name="date" value={slot.date} />
         <input type="hidden" name="slot" value={slot.slot} />
         <label className="block">
-          <span className="text-sm font-medium text-slate-700">Purpose</span>
-          <textarea
-            name="purpose"
-            required
-            rows={3}
-            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
-          />
-        </label>
-        <label className="block">
           <span className="text-sm font-medium text-slate-700">
-            Participant count
+            Group members information
           </span>
-          <input
-            name="participant_count"
-            type="number"
-            min={1}
-            step={1}
+          <span className="mt-1 block text-xs leading-5 text-slate-500">
+            Please list each group member&apos;s full name, student number, and phone number.
+          </span>
+          <textarea
+            name="group_members_details"
             required
+            rows={5}
             className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
           />
         </label>
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">
+        <fieldset className="rounded-md border border-slate-200 p-4">
+          <legend className="px-1 text-sm font-medium text-slate-700">
             Equipment needs
-          </span>
-          <textarea
-            name="equipment_needs"
-            rows={3}
-            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
-          />
-        </label>
+          </legend>
+          <div className="mt-3 space-y-3">
+            {RESERVATION_EQUIPMENT_OPTIONS.map((option) => (
+              <label
+                key={option}
+                className="flex gap-3 text-sm leading-5 text-slate-700"
+              >
+                <input
+                  name="equipment_needs"
+                  type="checkbox"
+                  value={option}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent"
+                />
+                <span>{option}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          <p>
+            By submitting this request, I confirm that I will leave the rehearsal
+            room clean and organized, use electronic equipment only as shown in
+            the training, contact a Music Club officer immediately if any problem
+            occurs, and cancel my request as early as possible if I cannot attend.
+          </p>
+          <label className="mt-3 flex gap-3 font-medium">
+            <input
+              name="usage_rules"
+              type="checkbox"
+              required
+              value="accepted"
+              className="mt-1 h-4 w-4 rounded border-amber-300 text-accent focus:ring-accent"
+            />
+            <span>I have read and agree to these usage rules.</span>
+          </label>
+        </div>
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
@@ -553,8 +575,10 @@ function AdminRequestDetails({ request }: { request: AdminReservationRequest }) 
         <Detail label="Start" value={formatDateTime(request.start_time)} />
         <Detail label="End" value={formatDateTime(request.end_time)} />
         <Detail label="Time" value={formatTimeRange(request.start_time, request.end_time)} />
-        <Detail label="Purpose" value={request.purpose} />
-        <Detail label="Participants" value={String(request.participant_count)} />
+        <Detail
+          label="Group members"
+          value={request.group_members_details}
+        />
         <Detail
           label="Equipment"
           value={request.equipment_needs || "None specified"}

@@ -4,9 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin, requireProfile } from "@/lib/auth/session";
 import {
+  countActiveMemberReservationRequests,
+  countMemberDailyActiveSlots,
+  RESERVATION_EQUIPMENT_OPTIONS,
   getReservationSlotRange,
   hasApprovedReservationConflict,
   hasCalendarBlockConflict,
+  isFutureSlot,
   isOneHourRange,
 } from "@/lib/reservations";
 import { createClient } from "@/lib/supabase/server";
@@ -21,14 +25,11 @@ function getStringValue(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
-function parseParticipantCount(value: string) {
-  const count = Number(value);
-
-  if (!Number.isInteger(count) || count < 1) {
-    return null;
-  }
-
-  return count;
+function getSelectedEquipment(formData: FormData) {
+  return formData
+    .getAll("equipment_needs")
+    .map((value) => String(value).trim())
+    .filter((value) => RESERVATION_EQUIPMENT_OPTIONS.includes(value));
 }
 
 function getRpcResult(
@@ -89,11 +90,9 @@ export async function createCalendarReservationRequestAction(formData: FormData)
   const supabase = await createClient();
   const date = getStringValue(formData, "date");
   const slot = getStringValue(formData, "slot");
-  const purpose = getStringValue(formData, "purpose");
-  const equipmentNeeds = getStringValue(formData, "equipment_needs");
-  const participantCount = parseParticipantCount(
-    getStringValue(formData, "participant_count"),
-  );
+  const groupMembersDetails = getStringValue(formData, "group_members_details");
+  const selectedEquipment = getSelectedEquipment(formData);
+  const usageRulesAccepted = formData.get("usage_rules") === "accepted";
   const range = getReservationSlotRange(date, slot);
 
   if (!range || !isOneHourRange(range)) {
@@ -104,12 +103,47 @@ export async function createCalendarReservationRequestAction(formData: FormData)
     redirectWithMessage("error", "The selected reservation time is not valid.");
   }
 
-  if (!purpose) {
-    redirectWithMessage("error", "Enter a purpose for the reservation request.");
+  if (!isFutureSlot(range.startTime)) {
+    redirectWithMessage("error", "Past slots cannot be requested.");
   }
 
-  if (participantCount === null) {
-    redirectWithMessage("error", "Participant count must be at least 1.");
+  if (!groupMembersDetails) {
+    redirectWithMessage("error", "Enter group members information.");
+  }
+
+  if (!selectedEquipment.length) {
+    redirectWithMessage("error", "Select at least one equipment option.");
+  }
+
+  if (!usageRulesAccepted) {
+    redirectWithMessage("error", "You must agree to the usage rules before submitting.");
+  }
+
+  const activeRequestCount = await countActiveMemberReservationRequests(
+    supabase,
+    user.id,
+  );
+
+  if (activeRequestCount.error) {
+    redirectWithMessage("error", "Could not check your active requests. Try again.");
+  }
+
+  if (activeRequestCount.count >= 10) {
+    redirectWithMessage("error", "You can have at most 10 active reservation requests.");
+  }
+
+  const dailyActiveSlotCount = await countMemberDailyActiveSlots(
+    supabase,
+    user.id,
+    date,
+  );
+
+  if (dailyActiveSlotCount.error) {
+    redirectWithMessage("error", "Could not check your daily reservation limit. Try again.");
+  }
+
+  if (dailyActiveSlotCount.count >= 2) {
+    redirectWithMessage("error", "You can request or use at most 2 hours per day.");
   }
 
   const approvedConflict = await hasApprovedReservationConflict(
@@ -144,9 +178,8 @@ export async function createCalendarReservationRequestAction(formData: FormData)
     user_id: user.id,
     start_time: range.startTime,
     end_time: range.endTime,
-    purpose,
-    participant_count: participantCount,
-    equipment_needs: equipmentNeeds || null,
+    group_members_details: groupMembersDetails,
+    equipment_needs: selectedEquipment.join("\n"),
     status: "pending",
     admin_note: null,
     updated_at: new Date().toISOString(),

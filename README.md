@@ -161,6 +161,12 @@ Reservation requests use predefined 1-hour slots between 10:00 and 18:00:
 15:00-16:00, 16:00-17:00, and 17:00-18:00. Pending requests do not block a
 slot. Approved reservations and calendar blocks do block a slot.
 
+Members can have at most 10 active reservation requests. Active means pending
+requests plus approved reservations whose `end_time` is in the future. Members
+can also request or use at most 2 active slots on the same `Europe/Istanbul`
+local calendar date. Rejected and cancelled requests do not count toward these
+limits.
+
 The calendar is the primary member request creation surface. Members request a
 new rehearsal slot by choosing an available time from `/calendar`, then track
 their own requests from `/reservations`. Dashboard gives quick access to the
@@ -168,6 +174,16 @@ calendar and current request/reservation status. Admins can inspect
 slot-specific pending and approved reservations from the calendar, while
 `/reservations` remains the tracking, management, and audit page organized into
 pending requests, upcoming approved reservations, and history.
+
+The request form collects required group member information and checkbox-based
+equipment selections. Selected equipment labels are stored as readable text in
+`equipment_needs`. Users must acknowledge the usage rules before submitting a
+request; this acknowledgement is validated in the UI/server action and is not
+stored in the database in this version.
+
+The calendar shows a 30-day range starting from today by default. Previous,
+today, and next navigation controls move the range in 30-day increments. Admins
+can navigate to past ranges to review historical reservation and block state.
 
 The project expects these reservation tables:
 
@@ -177,8 +193,7 @@ create table public.reservation_requests (
   user_id uuid not null references public.profiles(id),
   start_time timestamp with time zone not null,
   end_time timestamp with time zone not null,
-  purpose text not null,
-  participant_count integer not null,
+  group_members_details text not null,
   equipment_needs text,
   status text not null check (status in ('pending', 'approved', 'rejected', 'cancelled')),
   admin_note text,
@@ -210,6 +225,20 @@ create table public.calendar_blocks (
 
 These tables intentionally do not include a separate room relationship in the
 current single-room scope.
+
+Development migration from the earlier test schema can use the clean database
+path after clearing test reservation data:
+
+```sql
+alter table public.reservation_requests
+  add column group_members_details text not null;
+
+alter table public.reservation_requests
+  drop column purpose;
+
+alter table public.reservation_requests
+  drop column participant_count;
+```
 
 Calendar availability is exposed through privacy-safe Supabase RPC functions
 instead of giving members direct read access to other users' reservation rows.
@@ -255,7 +284,7 @@ get_calendar_pending_request_counts(
 ```
 
 The member RPC must never return requester names, usernames, phone numbers,
-student numbers, purpose, participant count, equipment needs, or admin notes.
+student numbers, request details, equipment needs, or admin notes.
 Pending counts are anonymous and may be shown to members for available slots.
 
 Admin approval uses a database RPC so approving one request and automatically
@@ -726,9 +755,9 @@ grant execute on function public.get_member_calendar_block_details(
 
 Reservation table fields:
 
-- `reservation_requests`: `id`, `user_id`, `start_time`, `end_time`, `purpose`,
-  `participant_count`, `equipment_needs`, `status`, `admin_note`, `created_at`,
-  `updated_at`
+- `reservation_requests`: `id`, `user_id`, `start_time`, `end_time`,
+  `group_members_details`, `equipment_needs`, `status`, `admin_note`,
+  `created_at`, `updated_at`
 - `reservation_status_history`: `id`, `reservation_request_id`, `changed_by`,
   `old_status`, `new_status`, `note`, `created_at`
 - `calendar_blocks`: `id`, `start_time`, `end_time`, `block_type`, `title`,

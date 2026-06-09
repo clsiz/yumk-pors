@@ -23,11 +23,22 @@ export const RESERVATION_SLOTS: ReservationSlot[] = [
   "17:00",
 ];
 
+export const CALENDAR_RANGE_DAYS = 30;
 export const RESERVATION_TIME_ZONE = "Europe/Istanbul";
 const RESERVATION_TIME_ZONE_OFFSET = "+03:00";
 
+export const RESERVATION_EQUIPMENT_OPTIONS = [
+  "amfi (fender)",
+  "amfi bluesman (küçük olan)",
+  "mixer ve mikrofonlar",
+  "bateri",
+  "bass amfisi",
+  "elektronik olmayan ekipman ile prova yapacağım (keman, flüt, vb.)",
+  "piyano",
+];
+
 const reservationRequestColumns =
-  "id, user_id, start_time, end_time, purpose, participant_count, equipment_needs, status, admin_note, created_at, updated_at";
+  "id, user_id, start_time, end_time, group_members_details, equipment_needs, status, admin_note, created_at, updated_at";
 
 const profileColumns =
   "id, username, full_name, email, phone, student_number, department";
@@ -153,17 +164,58 @@ export function getLocalDateString(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-export function getCalendarDates(dayCount = 7) {
+export function isLocalDateString(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+export function shiftLocalDate(date: string, dayOffset: number) {
+  if (!isLocalDateString(date)) {
+    return getLocalDateString(new Date());
+  }
+
+  const base = new Date(`${date}T12:00:00${RESERVATION_TIME_ZONE_OFFSET}`);
+  base.setUTCDate(base.getUTCDate() + dayOffset);
+
+  return getLocalDateString(base);
+}
+
+export function getCalendarDates(
+  dayCount = CALENDAR_RANGE_DAYS,
+  startDate = getLocalDateString(new Date()),
+) {
   const dates: string[] = [];
-  const now = new Date();
+  const safeStartDate = isLocalDateString(startDate)
+    ? startDate
+    : getLocalDateString(new Date());
 
   for (let index = 0; index < dayCount; index += 1) {
-    const next = new Date(now);
-    next.setDate(now.getDate() + index);
-    dates.push(getLocalDateString(next));
+    dates.push(shiftLocalDate(safeStartDate, index));
   }
 
   return dates;
+}
+
+export function getLocalDateDayRange(date: string): SlotRange | null {
+  if (!isLocalDateString(date)) {
+    return null;
+  }
+
+  const start = new Date(`${date}T00:00:00${RESERVATION_TIME_ZONE_OFFSET}`);
+  const nextDate = shiftLocalDate(date, 1);
+  const end = new Date(`${nextDate}T00:00:00${RESERVATION_TIME_ZONE_OFFSET}`);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return null;
+  }
+
+  return {
+    startTime: start.toISOString(),
+    endTime: end.toISOString(),
+  };
+}
+
+export function isFutureSlot(startTime: string) {
+  return new Date(startTime).getTime() > Date.now();
 }
 
 export async function hasApprovedReservationConflict(
@@ -195,6 +247,59 @@ export async function hasCalendarBlockConflict(
     .limit(1);
 
   return { hasConflict: Boolean(data?.length), error };
+}
+
+export async function countActiveMemberReservationRequests(
+  supabase: SupabaseClient,
+  userId: string,
+) {
+  const now = new Date().toISOString();
+  const [pendingResult, approvedResult] = await Promise.all([
+    supabase
+      .from("reservation_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "pending"),
+    supabase
+      .from("reservation_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .gt("end_time", now),
+  ]);
+
+  return {
+    count: (pendingResult.count ?? 0) + (approvedResult.count ?? 0),
+    error: pendingResult.error ?? approvedResult.error,
+  };
+}
+
+export async function countMemberDailyActiveSlots(
+  supabase: SupabaseClient,
+  userId: string,
+  date: string,
+) {
+  const range = getLocalDateDayRange(date);
+
+  if (!range) {
+    return {
+      count: 0,
+      error: new Error("Invalid reservation date."),
+    };
+  }
+
+  const { count, error } = await supabase
+    .from("reservation_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .in("status", ["pending", "approved"])
+    .gte("start_time", range.startTime)
+    .lt("start_time", range.endTime);
+
+  return {
+    count: count ?? 0,
+    error,
+  };
 }
 
 export async function fetchMemberReservationRequests(
@@ -384,6 +489,7 @@ export function buildCalendarSlotSummaries(
   return dates.map((date) =>
     RESERVATION_SLOTS.map((slot): CalendarSlotSummary => {
       const range = getReservationSlotRange(date, slot);
+      const isPast = range ? !isFutureSlot(range.startTime) : true;
       const occupiedSlot = range
         ? availabilityRows.find((row) =>
             hasOverlap(
@@ -465,6 +571,7 @@ export function buildCalendarSlotSummaries(
         date,
         slot,
         time: getSlotLabel(slot),
+        isPast,
         status,
         statusLabel,
         pendingCount,
