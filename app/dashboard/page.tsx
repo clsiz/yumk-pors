@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { requireProfile } from "@/lib/auth/session";
+import { fetchActiveAnnouncements } from "@/lib/announcements";
 import {
   formatReservationDateTime,
   formatReservationTimeRange,
   formatSubmittedDateTime,
 } from "@/lib/reservations";
 import { createClient } from "@/lib/supabase/server";
+import type { Announcement } from "@/types/announcement";
 import type { ReservationRequest } from "@/types/reservation";
 
 const requestColumns =
@@ -20,7 +22,10 @@ export default async function DashboardPage() {
     query = query.eq("user_id", user.id);
   }
 
-  const { data } = await query.order("start_time", { ascending: true });
+  const [{ data }, { announcements }] = await Promise.all([
+    query.order("start_time", { ascending: true }),
+    fetchActiveAnnouncements(supabase),
+  ]);
   const requests = (data ?? []) as ReservationRequest[];
   const now = new Date();
   const pendingRequests = requests.filter(
@@ -72,6 +77,7 @@ export default async function DashboardPage() {
           <MetricCard label="History items" value={historyCount} />
         ) : null}
       </div>
+      <AnnouncementsSection announcements={announcements} />
       {profile.role === "admin" ? (
         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-ink">Admin overview</h2>
@@ -94,6 +100,42 @@ export default async function DashboardPage() {
           />
         </div>
       )}
+    </section>
+  );
+}
+
+function AnnouncementsSection({
+  announcements,
+}: {
+  announcements: Announcement[];
+}) {
+  return (
+    <section className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-ink">Announcements</h2>
+      <div className="mt-4 space-y-4">
+        {announcements.length ? (
+          announcements.map((announcement) => (
+            <article
+              key={announcement.id}
+              className="rounded-md border border-slate-200 p-4"
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <h3 className="font-semibold text-slate-900">
+                  {announcement.title}
+                </h3>
+                <p className="shrink-0 text-xs font-medium text-slate-500">
+                  {formatReservationDateTime(announcement.created_at)}
+                </p>
+              </div>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                {announcement.body}
+              </p>
+            </article>
+          ))
+        ) : (
+          <p className="text-sm text-slate-500">No active announcements.</p>
+        )}
+      </div>
     </section>
   );
 }
