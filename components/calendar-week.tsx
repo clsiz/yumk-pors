@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { createCalendarReservationRequestAction } from "@/app/calendar/actions";
+import {
+  createCalendarBlockAction,
+  createCalendarReservationRequestAction,
+  createFullDayCalendarBlocksAction,
+} from "@/app/calendar/actions";
 import {
   approveReservationRequestAction,
   cancelApprovedReservationAction,
@@ -22,11 +26,15 @@ type CalendarWeekProps = {
 };
 
 type SelectedSlot = CalendarSlotSummary;
+type SelectedDay = {
+  date: string;
+};
 
 const RESERVATION_TIME_ZONE = "Europe/Istanbul";
 
 export function CalendarWeek({ calendarDays, dates, role }: CalendarWeekProps) {
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
+  const [selectedDay, setSelectedDay] = useState<SelectedDay | null>(null);
   const isMember = role === "member";
   const isAdmin = role === "admin";
 
@@ -37,9 +45,21 @@ export function CalendarWeek({ calendarDays, dates, role }: CalendarWeekProps) {
           <div className="grid min-w-[88rem] grid-cols-7 divide-x divide-slate-100">
             {calendarDays.map((slots, index) => (
               <div key={dates[index]} className="min-w-[13rem] p-4">
-                <p className="text-sm font-semibold text-slate-900">
-                  {formatCalendarDate(dates[index])}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {formatCalendarDate(dates[index])}
+                  </p>
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+                      onClick={() => setSelectedDay({ date: dates[index] })}
+                      title="Block full day"
+                    >
+                      ...
+                    </button>
+                  ) : null}
+                </div>
                 <div className="mt-4 space-y-3">
                   {slots.map((slot) => {
                     const isClickable =
@@ -72,6 +92,12 @@ export function CalendarWeek({ calendarDays, dates, role }: CalendarWeekProps) {
         <AdminSlotModal
           onClose={() => setSelectedSlot(null)}
           slot={selectedSlot}
+        />
+      ) : null}
+      {selectedDay && isAdmin ? (
+        <FullDayBlockModal
+          date={selectedDay.date}
+          onClose={() => setSelectedDay(null)}
         />
       ) : null}
     </>
@@ -236,6 +262,14 @@ function AdminSlotModal({
         <CloseButton onClose={onClose} />
       </div>
       <div className="mt-6 space-y-5">
+        {slot.status === "available" ? (
+          <section>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Create block
+            </h3>
+            <SingleSlotBlockForm slot={slot} />
+          </section>
+        ) : null}
         {pendingRequests.length ? (
           <section>
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -265,6 +299,111 @@ function AdminSlotModal({
           </section>
         ) : null}
       </div>
+    </ModalFrame>
+  );
+}
+
+function SingleSlotBlockForm({ slot }: { slot: CalendarSlotSummary }) {
+  return (
+    <form
+      action={createCalendarBlockAction}
+      className="mt-3 rounded-md border border-slate-200 p-4"
+    >
+      <input type="hidden" name="date" value={slot.date} />
+      <input type="hidden" name="slot" value={slot.slot} />
+      <input type="hidden" name="block_type" value="manual" />
+      <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+        {formatCalendarDate(slot.date)} - {slot.time}
+      </div>
+      <div className="mt-4 space-y-4">
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">Title</span>
+          <input
+            name="title"
+            type="text"
+            required
+            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+          />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">
+            Description
+          </span>
+          <textarea
+            name="description"
+            rows={3}
+            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+          />
+        </label>
+      </div>
+      <button
+        type="submit"
+        className="mt-4 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+      >
+        Block this slot
+      </button>
+    </form>
+  );
+}
+
+function FullDayBlockModal({
+  date,
+  onClose,
+}: {
+  date: string;
+  onClose: () => void;
+}) {
+  return (
+    <ModalFrame labelledBy="full-day-block-title">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 id="full-day-block-title" className="text-xl font-bold text-ink">
+            Block full day
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {formatCalendarDate(date)} - 10:00-18:00
+          </p>
+        </div>
+        <CloseButton onClose={onClose} />
+      </div>
+      <form action={createFullDayCalendarBlocksAction} className="mt-5 space-y-4">
+        <input type="hidden" name="date" value={date} />
+        <input type="hidden" name="block_type" value="manual" />
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">Title</span>
+          <input
+            name="title"
+            type="text"
+            required
+            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+          />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">
+            Description
+          </span>
+          <textarea
+            name="description"
+            rows={3}
+            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+          />
+        </label>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+          >
+            Block full day
+          </button>
+        </div>
+      </form>
     </ModalFrame>
   );
 }
@@ -519,7 +658,8 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function isAdminClickableSlot(slot: CalendarSlotSummary) {
   return Boolean(
-    slot.pendingRequests?.length ||
+    slot.status === "available" ||
+      slot.pendingRequests?.length ||
       slot.approvedRequest ||
       (slot.status === "closed" && slot.block),
   );

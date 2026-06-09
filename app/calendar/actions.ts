@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireProfile } from "@/lib/auth/session";
+import { requireAdmin, requireProfile } from "@/lib/auth/session";
 import {
   getReservationSlotRange,
   hasApprovedReservationConflict,
@@ -10,6 +10,7 @@ import {
   isOneHourRange,
 } from "@/lib/reservations";
 import { createClient } from "@/lib/supabase/server";
+import type { CalendarBlockRpcResult } from "@/types/reservation";
 
 function redirectWithMessage(type: "notice" | "error", message: string): never {
   const params = new URLSearchParams({ [type]: message });
@@ -28,6 +29,59 @@ function parseParticipantCount(value: string) {
   }
 
   return count;
+}
+
+function getRpcResult(
+  data: CalendarBlockRpcResult | CalendarBlockRpcResult[] | null,
+) {
+  return Array.isArray(data) ? data[0] : data;
+}
+
+function getBlockErrorMessage(errorMessage?: string) {
+  const normalized = errorMessage?.toLowerCase() ?? "";
+
+  if (normalized.includes("not an admin")) {
+    return "User is not an admin.";
+  }
+
+  if (normalized.includes("approved") || normalized.includes("reserved")) {
+    return "This slot is already reserved.";
+  }
+
+  if (normalized.includes("existing block") || normalized.includes("blocked")) {
+    return "This slot is already blocked.";
+  }
+
+  if (normalized.includes("invalid full-day") || normalized.includes("full day")) {
+    return "The selected day cannot be blocked.";
+  }
+
+  if (normalized.includes("invalid slot") || normalized.includes("allowed hours")) {
+    return "Select a valid one-hour slot between 10:00 and 18:00.";
+  }
+
+  return "Could not create the calendar block. Try again.";
+}
+
+function formatBlockSuccessMessage(result: CalendarBlockRpcResult | null) {
+  const createdBlockCount = result?.created_block_count ?? 0;
+  const autoRejectedCount = result?.auto_rejected_count ?? 0;
+  const blockLabel = createdBlockCount === 1 ? "block" : "blocks";
+  const rejectedMessage =
+    autoRejectedCount > 0
+      ? ` ${autoRejectedCount} overlapping pending ${
+          autoRejectedCount === 1 ? "request was" : "requests were"
+        } automatically rejected.`
+      : "";
+
+  return `${createdBlockCount} calendar ${blockLabel} created.${rejectedMessage}`;
+}
+
+function revalidateReservationViews() {
+  revalidatePath("/calendar");
+  revalidatePath("/reservations");
+  revalidatePath("/dashboard");
+  revalidatePath("/admin");
 }
 
 export async function createCalendarReservationRequestAction(formData: FormData) {
@@ -105,4 +159,83 @@ export async function createCalendarReservationRequestAction(formData: FormData)
   revalidatePath("/calendar");
   revalidatePath("/reservations");
   redirectWithMessage("notice", "Reservation request created.");
+}
+
+export async function createCalendarBlockAction(formData: FormData) {
+  await requireAdmin();
+  const supabase = await createClient();
+  const date = getStringValue(formData, "date");
+  const slot = getStringValue(formData, "slot");
+  const title = getStringValue(formData, "title");
+  const description = getStringValue(formData, "description");
+  const blockType = getStringValue(formData, "block_type") || "manual";
+  const range = getReservationSlotRange(date, slot);
+
+  if (!range || !isOneHourRange(range)) {
+    redirectWithMessage("error", "Select a valid one-hour slot between 10:00 and 18:00.");
+  }
+
+  if (!title) {
+    redirectWithMessage("error", "Enter a title for the calendar block.");
+  }
+
+  const { data, error } = await supabase.rpc(
+    "create_calendar_block_with_auto_reject",
+    {
+      block_start: range.startTime,
+      block_end: range.endTime,
+      block_title: title,
+      block_description: description || null,
+      block_type: blockType,
+    },
+  );
+
+  if (error) {
+    redirectWithMessage("error", getBlockErrorMessage(error.message));
+  }
+
+  const result = getRpcResult(
+    data as CalendarBlockRpcResult | CalendarBlockRpcResult[] | null,
+  );
+
+  revalidateReservationViews();
+  redirectWithMessage("notice", formatBlockSuccessMessage(result));
+}
+
+export async function createFullDayCalendarBlocksAction(formData: FormData) {
+  await requireAdmin();
+  const supabase = await createClient();
+  const date = getStringValue(formData, "date");
+  const title = getStringValue(formData, "title");
+  const description = getStringValue(formData, "description");
+  const blockType = getStringValue(formData, "block_type") || "manual";
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    redirectWithMessage("error", "Select a valid calendar date.");
+  }
+
+  if (!title) {
+    redirectWithMessage("error", "Enter a title for the calendar block.");
+  }
+
+  const { data, error } = await supabase.rpc(
+    "create_full_day_calendar_blocks_with_auto_reject",
+    {
+      block_date: date,
+      block_title: title,
+      block_description: description || null,
+      block_type: blockType,
+    },
+  );
+
+  if (error) {
+    redirectWithMessage("error", getBlockErrorMessage(error.message));
+  }
+
+  const result = getRpcResult(
+    data as CalendarBlockRpcResult | CalendarBlockRpcResult[] | null,
+  );
+
+  revalidateReservationViews();
+  redirectWithMessage("notice", formatBlockSuccessMessage(result));
 }

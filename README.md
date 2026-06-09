@@ -356,6 +356,288 @@ end;
 $$;
 ```
 
+Admins can also create calendar blocks from `/calendar`. A single-slot block
+closes one available 1-hour slot. A full-day block closes all 8 predefined
+slots from 10:00 to 18:00 on the selected local calendar date. Reserved slots
+must be cancelled before they can be blocked. Members see only the anonymous
+`Closed` status and never see block titles or descriptions.
+
+Block creation also uses database RPCs because creating block rows,
+auto-rejecting overlapping pending requests, and writing status history must be
+one atomic business operation:
+
+```sql
+create_calendar_block_with_auto_reject(
+  block_start timestamp with time zone,
+  block_end timestamp with time zone,
+  block_title text,
+  block_description text,
+  block_type text
+)
+
+create_full_day_calendar_blocks_with_auto_reject(
+  block_date date,
+  block_title text,
+  block_description text,
+  block_type text
+)
+
+-- Expected success columns for both functions:
+-- created_block_count integer
+-- auto_rejected_count integer
+```
+
+Both functions should verify `public.is_admin()`, reject conflicts with
+approved reservations or existing blocks, reject only overlapping pending
+requests, and insert `reservation_status_history` rows for automatic
+rejections. Automatic rejections should use this note:
+
+```text
+Automatically rejected because this slot was blocked by an admin.
+```
+
+The full-day function must generate the 8 slots for the selected local
+`block_date` in `Europe/Istanbul`, not by UTC date parsing.
+
+Example setup SQL:
+
+```sql
+create or replace function public.create_calendar_block_with_auto_reject(
+  block_start timestamp with time zone,
+  block_end timestamp with time zone,
+  block_title text,
+  block_description text default null,
+  block_type text default 'manual'
+)
+returns table (
+  created_block_count integer,
+  auto_rejected_count integer
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  local_start timestamp;
+  auto_reject_note text :=
+    'Automatically rejected because this slot was blocked by an admin.';
+begin
+  if not public.is_admin() then
+    raise exception 'User is not an admin.';
+  end if;
+
+  local_start := timezone('Europe/Istanbul', block_start);
+
+  if block_end <> block_start + interval '1 hour'
+     or extract(minute from local_start) <> 0
+     or extract(second from local_start) <> 0
+     or extract(hour from local_start) < 10
+     or extract(hour from local_start) > 17 then
+    raise exception 'Invalid slot.';
+  end if;
+
+  if exists (
+    select 1
+      from public.reservation_requests request
+     where request.status = 'approved'
+       and request.start_time < block_end
+       and request.end_time > block_start
+  ) then
+    raise exception 'This slot is already reserved.';
+  end if;
+
+  if exists (
+    select 1
+      from public.calendar_blocks existing_block
+     where existing_block.start_time < block_end
+       and existing_block.end_time > block_start
+  ) then
+    raise exception 'This slot is already blocked.';
+  end if;
+
+  insert into public.calendar_blocks (
+    start_time,
+    end_time,
+    block_type,
+    title,
+    description,
+    created_by
+  )
+  values (
+    block_start,
+    block_end,
+    coalesce(nullif(block_type, ''), 'manual'),
+    block_title,
+    nullif(block_description, ''),
+    auth.uid()
+  );
+
+  created_block_count := 1;
+
+  with rejected as (
+    update public.reservation_requests request
+       set status = 'rejected',
+           admin_note = auto_reject_note,
+           updated_at = now()
+     where request.status = 'pending'
+       and request.start_time < block_end
+       and request.end_time > block_start
+     returning request.id
+  ),
+  history as (
+    insert into public.reservation_status_history (
+      reservation_request_id,
+      changed_by,
+      old_status,
+      new_status,
+      note
+    )
+    select
+      rejected.id,
+      auth.uid(),
+      'pending',
+      'rejected',
+      auto_reject_note
+      from rejected
+    returning reservation_request_id
+  )
+  select count(*)::integer
+    into auto_rejected_count
+    from history;
+
+  return next;
+end;
+$$;
+
+create or replace function public.create_full_day_calendar_blocks_with_auto_reject(
+  block_date date,
+  block_title text,
+  block_description text default null,
+  block_type text default 'manual'
+)
+returns table (
+  created_block_count integer,
+  auto_rejected_count integer
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  auto_reject_note text :=
+    'Automatically rejected because this slot was blocked by an admin.';
+begin
+  if not public.is_admin() then
+    raise exception 'User is not an admin.';
+  end if;
+
+  create temporary table temp_calendar_block_slots (
+    start_time timestamp with time zone,
+    end_time timestamp with time zone
+  ) on commit drop;
+
+  insert into temp_calendar_block_slots (start_time, end_time)
+  select
+    make_timestamptz(
+      extract(year from block_date)::integer,
+      extract(month from block_date)::integer,
+      extract(day from block_date)::integer,
+      slot_hour,
+      0,
+      0,
+      'Europe/Istanbul'
+    ),
+    make_timestamptz(
+      extract(year from block_date)::integer,
+      extract(month from block_date)::integer,
+      extract(day from block_date)::integer,
+      slot_hour + 1,
+      0,
+      0,
+      'Europe/Istanbul'
+    )
+  from generate_series(10, 17) as slot_hour;
+
+  if exists (
+    select 1
+      from temp_calendar_block_slots slot
+      join public.reservation_requests request
+        on request.status = 'approved'
+       and request.start_time < slot.end_time
+       and request.end_time > slot.start_time
+  ) then
+    raise exception 'This full day contains an approved reservation.';
+  end if;
+
+  if exists (
+    select 1
+      from temp_calendar_block_slots slot
+      join public.calendar_blocks existing_block
+        on existing_block.start_time < slot.end_time
+       and existing_block.end_time > slot.start_time
+  ) then
+    raise exception 'This full day contains an existing block.';
+  end if;
+
+  insert into public.calendar_blocks (
+    start_time,
+    end_time,
+    block_type,
+    title,
+    description,
+    created_by
+  )
+  select
+    slot.start_time,
+    slot.end_time,
+    coalesce(nullif(block_type, ''), 'manual'),
+    block_title,
+    nullif(block_description, ''),
+    auth.uid()
+    from temp_calendar_block_slots slot;
+
+  get diagnostics created_block_count = row_count;
+
+  with rejected as (
+    update public.reservation_requests request
+       set status = 'rejected',
+           admin_note = auto_reject_note,
+           updated_at = now()
+     where request.status = 'pending'
+       and exists (
+         select 1
+           from temp_calendar_block_slots slot
+          where request.start_time < slot.end_time
+            and request.end_time > slot.start_time
+       )
+     returning request.id
+  ),
+  history as (
+    insert into public.reservation_status_history (
+      reservation_request_id,
+      changed_by,
+      old_status,
+      new_status,
+      note
+    )
+    select
+      rejected.id,
+      auth.uid(),
+      'pending',
+      'rejected',
+      auto_reject_note
+      from rejected
+    returning reservation_request_id
+  )
+  select count(*)::integer
+    into auto_rejected_count
+    from history;
+
+  return next;
+end;
+$$;
+```
+
 Reservation table fields:
 
 - `reservation_requests`: `id`, `user_id`, `start_time`, `end_time`, `purpose`,

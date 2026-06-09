@@ -82,6 +82,11 @@ export type ApproveReservationRpcResult = {
   auto_rejected_count: number;
 };
 
+export type CalendarBlockRpcResult = {
+  created_block_count: number;
+  auto_rejected_count: number;
+};
+
 export type ReservationStatusHistory = {
   id: string;
   reservation_request_id: string;
