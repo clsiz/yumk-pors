@@ -379,6 +379,7 @@ function AdminRequestDetails({ request }: { request: AdminReservationRequest }) 
         />
         <Detail label="Department" value={request.requester?.department || "-"} />
         <Detail label="Email" value={request.requester?.email || "-"} />
+        <Detail label="Submitted" value={formatSubmittedDateTime(request.created_at)} />
         <Detail label="Start" value={formatDateTime(request.start_time)} />
         <Detail label="End" value={formatDateTime(request.end_time)} />
         <Detail label="Time" value={formatTimeRange(request.start_time, request.end_time)} />
@@ -538,6 +539,10 @@ function formatDateTime(value: string) {
     timeStyle: "short",
     timeZone: RESERVATION_TIME_ZONE,
   }).format(new Date(value));
+}
+
+function formatSubmittedDateTime(value: string) {
+  return formatDateTime(value);
 }
 
 function formatTimeRange(startTime: string, endTime: string) {
