@@ -13,6 +13,7 @@ export type CalendarSlotSummary = {
   reservationRequesterName?: string;
   reservationRequesterUsername?: string;
   blockTitle?: string;
+  blockDescription?: string;
   pendingRequests?: AdminReservationRequest[];
   approvedRequest?: AdminReservationRequest;
   block?: CalendarBlock;
@@ -36,6 +37,13 @@ export type CalendarPendingCountRow = {
   start_time: string;
   end_time: string;
   pending_count: number;
+};
+
+export type MemberCalendarBlockDetailsRow = {
+  start_time: string;
+  end_time: string;
+  block_title: string;
+  block_description: string | null;
 };
 
 export type ReservationSlot =

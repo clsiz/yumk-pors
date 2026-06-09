@@ -7,6 +7,7 @@ import {
   fetchAdminCalendarRequestsForRange,
   fetchAdminCalendarAvailability,
   fetchCalendarPendingRequestCounts,
+  fetchMemberCalendarBlockDetails,
   fetchMemberCalendarAvailability,
   getCalendarDates,
   getReservationSlotRange,
@@ -41,6 +42,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     { pendingCounts, error: pendingCountsError },
     { requests: adminRequests, error: adminRequestsError },
     { blocks: adminBlocks, error: adminBlocksError },
+    { blockDetails: memberBlockDetails },
   ] =
     firstRange && lastRange
       ? await Promise.all([
@@ -68,12 +70,20 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                 lastRange.endTime,
               )
             : Promise.resolve({ blocks: [], error: null }),
+          profile.role === "member"
+            ? fetchMemberCalendarBlockDetails(
+                supabase,
+                firstRange.startTime,
+                lastRange.endTime,
+              )
+            : Promise.resolve({ blockDetails: [], error: null }),
         ])
       : [
           { availability: [], error: null },
           { pendingCounts: [], error: null },
           { requests: [], error: null },
           { blocks: [], error: null },
+          { blockDetails: [] },
         ];
 
   const calendarDays = buildCalendarSlotSummaries(
@@ -82,7 +92,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     pendingCounts,
     profile.role === "admin"
       ? { adminRequests, adminBlocks }
-      : undefined,
+      : { memberBlockDetails },
   );
   const loadError =
     params.error ||

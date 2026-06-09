@@ -356,11 +356,13 @@ end;
 $$;
 ```
 
-Admins can also create calendar blocks from `/calendar`. A single-slot block
-closes one available 1-hour slot. A full-day block closes all 8 predefined
-slots from 10:00 to 18:00 on the selected local calendar date. Reserved slots
-must be cancelled before they can be blocked. Members see only the anonymous
-`Closed` status and never see block titles or descriptions.
+Admins can also create and remove calendar blocks from `/calendar`. A
+single-slot block closes one available 1-hour slot. A full-day block closes all
+8 predefined slots from 10:00 to 18:00 on the selected local calendar date.
+Reserved slots must be cancelled before they can be blocked. Removing a block
+does not restore pending requests that were previously automatically rejected.
+Members see `Closed` plus the block title and optional description, but never
+see reservation, requester, or internal admin details.
 
 Block creation also uses database RPCs because creating block rows,
 auto-rejecting overlapping pending requests, and writing status history must be
@@ -636,6 +638,41 @@ begin
   return next;
 end;
 $$;
+```
+
+Members receive safe block explanations through a privacy-safe RPC that returns
+only calendar block metadata:
+
+```sql
+create or replace function public.get_member_calendar_block_details(
+  range_start timestamp with time zone,
+  range_end timestamp with time zone
+)
+returns table (
+  start_time timestamp with time zone,
+  end_time timestamp with time zone,
+  block_title text,
+  block_description text
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    block.start_time,
+    block.end_time,
+    block.title as block_title,
+    block.description as block_description
+  from public.calendar_blocks block
+  where block.start_time < range_end
+    and block.end_time > range_start
+  order by block.start_time;
+$$;
+
+grant execute on function public.get_member_calendar_block_details(
+  timestamp with time zone,
+  timestamp with time zone
+) to authenticated;
 ```
 
 Reservation table fields:

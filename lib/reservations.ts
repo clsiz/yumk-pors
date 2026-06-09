@@ -7,6 +7,7 @@ import type {
   CalendarPendingCountRow,
   CalendarSlotSummary,
   MemberCalendarAvailabilityRow,
+  MemberCalendarBlockDetailsRow,
   ReservationRequest,
   ReservationSlot,
 } from "@/types/reservation";
@@ -350,6 +351,23 @@ export async function fetchCalendarPendingRequestCounts(
   };
 }
 
+export async function fetchMemberCalendarBlockDetails(
+  supabase: SupabaseClient,
+  startTime: string,
+  endTime: string,
+) {
+  const { data, error } = await supabase
+    .rpc("get_member_calendar_block_details", {
+      range_start: startTime,
+      range_end: endTime,
+    });
+
+  return {
+    blockDetails: (data ?? []) as MemberCalendarBlockDetailsRow[],
+    error,
+  };
+}
+
 export function buildCalendarSlotSummaries(
   dates: string[],
   availabilityRows: (
@@ -360,6 +378,7 @@ export function buildCalendarSlotSummaries(
   options: {
     adminRequests?: AdminReservationRequest[];
     adminBlocks?: CalendarBlock[];
+    memberBlockDetails?: MemberCalendarBlockDetailsRow[];
   } = {},
 ) {
   return dates.map((date) =>
@@ -421,6 +440,16 @@ export function buildCalendarSlotSummaries(
             ),
           )
         : undefined;
+      const memberBlockDetail = range
+        ? options.memberBlockDetails?.find((calendarBlock) =>
+            hasOverlap(
+              range.startTime,
+              range.endTime,
+              calendarBlock.start_time,
+              calendarBlock.end_time,
+            ),
+          )
+        : undefined;
 
       const status = occupiedSlot?.slot_status === "Closed"
         ? "closed"
@@ -447,7 +476,13 @@ export function buildCalendarSlotSummaries(
           approvedRequest?.requester?.username ??
           adminSlot?.requester_username ??
           undefined,
-        blockTitle: block?.title ?? adminSlot?.block_title ?? undefined,
+        blockTitle:
+          block?.title ??
+          memberBlockDetail?.block_title ??
+          adminSlot?.block_title ??
+          undefined,
+        blockDescription:
+          block?.description ?? memberBlockDetail?.block_description ?? undefined,
         pendingRequests: pendingRequests?.length ? pendingRequests : undefined,
         approvedRequest,
         block,
