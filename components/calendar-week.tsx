@@ -5,6 +5,7 @@ import {
   createCalendarBlockAction,
   createCalendarReservationRequestAction,
   createFullDayCalendarBlocksAction,
+  deleteCalendarBlockAction,
 } from "@/app/calendar/actions";
 import {
   approveReservationRequestAction,
@@ -132,6 +133,12 @@ function CalendarSlotCard({
           status={slot.statusLabel}
         />
       ) : null}
+      {role === "member" && slot.status === "closed" ? (
+        <MemberClosedSlotDetail
+          description={slot.blockDescription}
+          title={slot.blockTitle}
+        />
+      ) : null}
       {role === "member" &&
       slot.status === "available" &&
       slot.pendingCount &&
@@ -142,11 +149,7 @@ function CalendarSlotCard({
       ) : null}
     </>
   );
-  const className = `flex min-h-24 w-full flex-col justify-between gap-2 rounded-md border p-3 text-left text-sm transition ${
-    isClickable
-      ? "border-emerald-200 bg-emerald-50/60 hover:border-emerald-400 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-accent/30"
-      : "border-slate-200 bg-slate-50"
-  }`;
+  const className = getSlotCardClassName(slot, isClickable);
 
   if (isClickable) {
     return (
@@ -492,7 +495,35 @@ function AdminCalendarBlockCard({ block }: { block: CalendarBlock }) {
         <Detail label="End" value={formatDateTime(block.end_time)} />
         <Detail label="Description" value={block.description || "-"} />
       </dl>
+      <form action={deleteCalendarBlockAction} className="mt-4">
+        <input type="hidden" name="block_id" value={block.id} />
+        <button
+          type="submit"
+          className="rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+        >
+          Remove block
+        </button>
+      </form>
     </article>
+  );
+}
+
+function MemberClosedSlotDetail({
+  description,
+  title,
+}: {
+  description?: string;
+  title?: string;
+}) {
+  if (!title && !description) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-1 text-xs text-red-700">
+      {title ? <p className="truncate font-medium">{title}</p> : null}
+      {description ? <p className="line-clamp-2 text-red-600">{description}</p> : null}
+    </div>
   );
 }
 
@@ -619,13 +650,32 @@ function CalendarStatusBadge({
       ? "bg-emerald-100 text-emerald-800"
       : status === "Reserved"
         ? "bg-amber-100 text-amber-800"
-        : "bg-slate-200 text-slate-700";
+        : "bg-red-100 text-red-800";
 
   return (
     <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${colorClass}`}>
       {status}
     </span>
   );
+}
+
+function getSlotCardClassName(slot: CalendarSlotSummary, isClickable: boolean) {
+  const base =
+    "flex min-h-24 w-full flex-col justify-between gap-2 rounded-md border p-3 text-left text-sm transition";
+
+  if (slot.status === "closed") {
+    return `${base} border-red-200 bg-red-50/70 ${
+      isClickable
+        ? "hover:border-red-300 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200"
+        : ""
+    }`;
+  }
+
+  if (isClickable) {
+    return `${base} border-emerald-200 bg-emerald-50/60 hover:border-emerald-400 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-accent/30`;
+  }
+
+  return `${base} border-slate-200 bg-slate-50`;
 }
 
 function StatusBadge({ status }: { status: ReservationRequest["status"] }) {

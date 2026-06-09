@@ -239,3 +239,27 @@ export async function createFullDayCalendarBlocksAction(formData: FormData) {
   revalidateReservationViews();
   redirectWithMessage("notice", formatBlockSuccessMessage(result));
 }
+
+export async function deleteCalendarBlockAction(formData: FormData) {
+  await requireAdmin();
+  const supabase = await createClient();
+  const blockId = getStringValue(formData, "block_id");
+
+  if (!blockId) {
+    redirectWithMessage("error", "Calendar block was not found.");
+  }
+
+  const { data, error } = await supabase
+    .from("calendar_blocks")
+    .delete()
+    .eq("id", blockId)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data) {
+    redirectWithMessage("error", "Could not remove the calendar block. Try again.");
+  }
+
+  revalidateReservationViews();
+  redirectWithMessage("notice", "Calendar block removed.");
+}
