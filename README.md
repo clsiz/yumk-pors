@@ -100,6 +100,55 @@ The optional `profiles.email` field is a contact field reserved for future
 contact, notification, and account recovery support. It is not used for the
 current login flow. Users continue to sign in with username and password only.
 
+## Announcements
+
+Announcements provide a simple way to share rehearsal room updates on the
+authenticated dashboard. Admins create announcements from `/admin` and can hide
+announcements when they are no longer current. Hidden announcements are retained
+for admin review but no longer appear on member dashboards. Email notifications
+can be added in a future milestone if needed.
+
+Setup SQL:
+
+```sql
+create table if not exists public.announcements (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  body text not null,
+  is_active boolean not null default true,
+  created_by uuid references public.profiles(id),
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+alter table public.announcements enable row level security;
+
+create policy "Authenticated users can view active announcements"
+on public.announcements
+for select
+to authenticated
+using (is_active = true);
+
+create policy "Admins can view all announcements"
+on public.announcements
+for select
+to authenticated
+using (public.is_admin());
+
+create policy "Admins can create announcements"
+on public.announcements
+for insert
+to authenticated
+with check (public.is_admin());
+
+create policy "Admins can update announcements"
+on public.announcements
+for update
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+```
+
 ## Reservation Model
 
 The current scope includes one rehearsal room. Therefore, the initial database
