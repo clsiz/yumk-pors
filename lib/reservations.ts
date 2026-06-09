@@ -120,6 +120,10 @@ export function formatReservationDateTime(value: string) {
   }).format(new Date(value));
 }
 
+export function formatSubmittedDateTime(value: string) {
+  return `Submitted: ${formatReservationDateTime(value)}`;
+}
+
 export function formatReservationTimeRange(startTime: string, endTime: string) {
   const formatter = new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",

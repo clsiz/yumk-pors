@@ -114,9 +114,11 @@ slot. Approved reservations and calendar blocks do block a slot.
 
 The calendar is the primary member request creation surface. Members request a
 new rehearsal slot by choosing an available time from `/calendar`, then track
-their own requests from `/reservations`. Admins can inspect slot-specific
-pending and approved reservations from the calendar, while `/reservations`
-remains the full request management and audit page.
+their own requests from `/reservations`. Dashboard gives quick access to the
+calendar and current request/reservation status. Admins can inspect
+slot-specific pending and approved reservations from the calendar, while
+`/reservations` remains the tracking, management, and audit page organized into
+pending requests, upcoming approved reservations, and history.
 
 The project expects these reservation tables:
 
