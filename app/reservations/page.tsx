@@ -39,7 +39,6 @@ export default async function ReservationsPage({
     return (
       <ReservationsShell
         title="Reservation Requests"
-        description="Review and manage all reservation requests for the rehearsal room."
         notice={params.notice}
         error={params.error ?? (error ? "Could not load reservation requests." : undefined)}
       >
@@ -56,7 +55,6 @@ export default async function ReservationsPage({
   return (
     <ReservationsShell
       title="My Reservation Requests"
-      description="Review your own reservation requests and cancellation status."
       notice={params.notice}
       error={params.error ?? (error ? "Could not load your reservation requests." : undefined)}
     >
@@ -87,13 +85,11 @@ function MemberCalendarCallout() {
 
 function ReservationsShell({
   title,
-  description,
   notice,
   error,
   children,
 }: {
   title: string;
-  description: string;
   notice?: string;
   error?: string;
   children: React.ReactNode;
@@ -102,7 +98,6 @@ function ReservationsShell({
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <div>
         <h1 className="text-3xl font-bold text-ink">{title}</h1>
-        <p className="mt-2 text-slate-600">{description}</p>
       </div>
       <StatusMessage notice={notice} error={error} />
       <div className="mt-8">{children}</div>

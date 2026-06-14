@@ -120,8 +120,8 @@ function CalendarSlotCard({
 }) {
   const content = (
     <>
-      <div className="flex items-start justify-between gap-2">
-        <span className="whitespace-nowrap text-sm font-semibold text-slate-800">
+      <div className="flex min-w-0 flex-col items-start gap-1.5">
+        <span className="min-w-0 whitespace-nowrap text-sm font-semibold text-slate-800">
           {slot.time}
         </span>
         <CalendarStatusBadge status={slot.statusLabel} />
@@ -681,7 +681,7 @@ function CalendarStatusBadge({
         : "bg-red-100 text-red-800 ring-1 ring-red-200";
 
   return (
-    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${colorClass}`}>
+    <span className={`max-w-full rounded-full px-2 py-1 text-[0.68rem] font-semibold leading-none ${colorClass}`}>
       {status}
     </span>
   );

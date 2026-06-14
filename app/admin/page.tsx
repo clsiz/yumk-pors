@@ -18,7 +18,7 @@ type AdminPageProps = {
 };
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const { profile } = await requireAdmin();
+  await requireAdmin();
   const supabase = await createClient();
   const params = searchParams ? await searchParams : {};
   const [{ data }, { announcements, error: announcementsError }] =
@@ -41,9 +41,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           Admin access
         </p>
         <h1 className="mt-2 text-3xl font-bold text-ink">Admin</h1>
-        <p className="mt-2 text-slate-600">
-          Manage users and review reservation requests for {profile.full_name}.
-        </p>
       </div>
       <StatusMessage
         error={
