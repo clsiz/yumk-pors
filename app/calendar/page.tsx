@@ -119,9 +119,6 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-ink">Calendar</h1>
-          <p className="mt-2 text-slate-600">
-            30-day availability for the single rehearsal room.
-          </p>
         </div>
         <div className="flex flex-col gap-3 sm:items-end">
           {profile.role === "admin" ? (

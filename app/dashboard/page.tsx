@@ -49,9 +49,6 @@ export default async function DashboardPage() {
           {profile.role}
         </p>
         <h1 className="mt-2 text-3xl font-bold text-ink">Dashboard</h1>
-        <p className="mt-2 text-slate-600">
-          Overview of rehearsal room activity for {profile.full_name}.
-        </p>
       </div>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <Link
