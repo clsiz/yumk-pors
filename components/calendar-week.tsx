@@ -42,23 +42,24 @@ export function CalendarWeek({ calendarDays, dates, role }: CalendarWeekProps) {
 
   return (
     <>
-      <div className="mt-8 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:mt-8">
         <div className="overflow-x-auto">
-          <div className="grid min-w-[390rem] grid-cols-[repeat(30,minmax(13rem,1fr))] divide-x divide-slate-100">
+          <div className="grid min-w-[360rem] grid-cols-[repeat(30,minmax(12rem,1fr))] divide-x divide-slate-100">
             {calendarDays.map((slots, index) => (
-              <div key={dates[index]} className="min-w-[13rem] p-4">
+              <div key={dates[index]} className="min-w-[12rem] p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-sm font-semibold leading-5 text-slate-900">
                     {formatCalendarDate(dates[index])}
                   </p>
                   {isAdmin ? (
                     <button
                       type="button"
-                      className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+                      aria-label={`Block ${formatCalendarDate(dates[index])}`}
+                      className="shrink-0 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
                       onClick={() => setSelectedDay({ date: dates[index] })}
                       title="Block full day"
                     >
-                      ...
+                      Block
                     </button>
                   ) : null}
                 </div>
@@ -119,7 +120,7 @@ function CalendarSlotCard({
 }) {
   const content = (
     <>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-start justify-between gap-2">
         <span className="whitespace-nowrap text-sm font-semibold text-slate-800">
           {slot.time}
         </span>
@@ -144,9 +145,12 @@ function CalendarSlotCard({
       slot.status === "available" &&
       slot.pendingCount &&
       slot.pendingCount > 0 ? (
-        <p className="truncate text-xs font-medium text-slate-500">
+        <p className="text-xs font-medium leading-5 text-slate-500">
           {formatPendingCount(slot.pendingCount)}
         </p>
+      ) : null}
+      {slot.isPast ? (
+        <p className="text-xs font-medium leading-5 text-slate-500">Past slot</p>
       ) : null}
     </>
   );
@@ -188,7 +192,7 @@ function RequestSlotModal({
           {formatPendingCount(slot.pendingCount)} for this slot.
         </div>
       ) : null}
-      <form action={createCalendarReservationRequestAction} className="mt-5 space-y-4">
+      <form action={createCalendarReservationRequestAction} className="mt-5 space-y-5">
         <input type="hidden" name="date" value={slot.date} />
         <input type="hidden" name="slot" value={slot.slot} />
         <label className="block">
@@ -202,24 +206,24 @@ function RequestSlotModal({
             name="group_members_details"
             required
             rows={5}
-            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
           />
         </label>
-        <fieldset className="rounded-md border border-slate-200 p-4">
+        <fieldset className="rounded-md border border-slate-200 bg-slate-50/60 p-4">
           <legend className="px-1 text-sm font-medium text-slate-700">
             Equipment needs
           </legend>
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {RESERVATION_EQUIPMENT_OPTIONS.map((option) => (
               <label
                 key={option}
-                className="flex gap-3 text-sm leading-5 text-slate-700"
+                className="flex items-start gap-3 rounded-md bg-white px-3 py-2 text-sm leading-5 text-slate-700 ring-1 ring-slate-200"
               >
                 <input
                   name="equipment_needs"
                   type="checkbox"
                   value={option}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-accent focus:ring-accent"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-accent focus:ring-accent"
                 />
                 <span>{option}</span>
               </label>
@@ -233,28 +237,28 @@ function RequestSlotModal({
             the training, contact a Music Club officer immediately if any problem
             occurs, and cancel my request as early as possible if I cannot attend.
           </p>
-          <label className="mt-3 flex gap-3 font-medium">
+          <label className="mt-4 flex items-start gap-3 rounded-md bg-white/70 p-3 font-medium">
             <input
               name="usage_rules"
               type="checkbox"
               required
               value="accepted"
-              className="mt-1 h-4 w-4 rounded border-amber-300 text-accent focus:ring-accent"
+              className="mt-1 h-4 w-4 shrink-0 rounded border-amber-300 text-accent focus:ring-accent"
             />
             <span>I have read and agree to these usage rules.</span>
           </label>
         </div>
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
           <button
             type="button"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="w-full rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
             onClick={onClose}
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            className="w-full rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 sm:w-auto"
           >
             Submit request
           </button>
@@ -416,14 +420,14 @@ function FullDayBlockModal({
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="w-full rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
             onClick={onClose}
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            className="w-full rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 sm:w-auto"
           >
             Block full day
           </button>
@@ -498,7 +502,7 @@ function AdminApprovedRequestCard({
         />
         <button
           type="submit"
-          className="rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+          className="w-full rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 sm:w-auto"
         >
           Cancel reservation
         </button>
@@ -521,7 +525,7 @@ function AdminCalendarBlockCard({ block }: { block: CalendarBlock }) {
         <input type="hidden" name="block_id" value={block.id} />
         <button
           type="submit"
-          className="rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+          className="w-full rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 sm:w-auto"
         >
           Remove block
         </button>
@@ -624,7 +628,7 @@ function AdminSlotDetail({
     return null;
   }
 
-  return <p className="truncate text-xs text-slate-500">{detail}</p>;
+  return <p className="line-clamp-2 text-xs leading-5 text-slate-500">{detail}</p>;
 }
 
 function ModalFrame({
@@ -642,10 +646,10 @@ function ModalFrame({
     <div
       aria-labelledby={labelledBy}
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-3 py-4 sm:px-4 sm:py-6"
       role="dialog"
     >
-      <div className={`max-h-[90vh] w-full overflow-y-auto rounded-lg bg-white p-6 shadow-xl ${widthClass}`}>
+      <div className={`max-h-[92vh] w-full overflow-y-auto rounded-lg bg-white p-4 shadow-xl sm:p-6 ${widthClass}`}>
         {children}
       </div>
     </div>
@@ -671,13 +675,13 @@ function CalendarStatusBadge({
 }) {
   const colorClass =
     status === "Available"
-      ? "bg-emerald-100 text-emerald-800"
+      ? "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200"
       : status === "Reserved"
-        ? "bg-amber-100 text-amber-800"
-        : "bg-red-100 text-red-800";
+        ? "bg-amber-100 text-amber-800 ring-1 ring-amber-200"
+        : "bg-red-100 text-red-800 ring-1 ring-red-200";
 
   return (
-    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${colorClass}`}>
+    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${colorClass}`}>
       {status}
     </span>
   );
@@ -687,12 +691,20 @@ function getSlotCardClassName(slot: CalendarSlotSummary, isClickable: boolean) {
   const base =
     "flex min-h-24 w-full flex-col justify-between gap-2 rounded-md border p-3 text-left text-sm transition";
 
+  if (slot.isPast) {
+    return `${base} border-slate-200 bg-slate-100 text-slate-500`;
+  }
+
   if (slot.status === "closed") {
     return `${base} border-red-200 bg-red-50/70 ${
       isClickable
         ? "hover:border-red-300 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200"
         : ""
     }`;
+  }
+
+  if (slot.status === "reserved") {
+    return `${base} border-amber-200 bg-amber-50/70`;
   }
 
   if (isClickable) {

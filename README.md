@@ -763,6 +763,45 @@ Reservation table fields:
 - `calendar_blocks`: `id`, `start_time`, `end_time`, `block_type`, `title`,
   `description`, `created_by`, `created_at`
 
+## Demo Flow
+
+Use seeded or manually created admin/member accounts before the presentation.
+
+1. Log in as a member with the username and password provided by an admin.
+2. Open `/calendar` and review the 30-day room availability view.
+3. Select an available future slot, enter group member information, choose
+   equipment needs, accept the usage rules, and submit a reservation request.
+4. Open `/reservations` as the member and confirm the request is pending.
+5. Log out, then log in as an admin.
+6. Open `/reservations` or `/calendar` and approve one pending request.
+7. Reject another pending request with an optional admin note.
+8. Open `/calendar` as admin and block a single slot, then block a full day.
+9. Open `/admin`, create an announcement, and verify it appears on the member
+   dashboard.
+10. Hide the announcement and verify it no longer appears for members.
+11. Log back in as a member and confirm member views do not expose other
+    members' request details.
+
+## Final Manual Test Checklist
+
+- `npm run lint` passes.
+- `npm run build` passes.
+- Member login redirects to `/dashboard`.
+- Member reservation request creation from an available calendar slot works.
+- Member pending requests can still be cancelled by the member.
+- Admin approval and rejection still work from `/reservations`.
+- Admin approval and rejection still work from calendar slot details.
+- Admin cancellation of an approved reservation still works.
+- Admin single-slot calendar blocks still work.
+- Admin full-day calendar blocks still work.
+- Announcement creation and hiding still work.
+- Members see active announcements and do not see hidden announcements.
+- Member privacy is preserved; member pages do not show other members'
+  requester details.
+- `/dashboard`, `/calendar`, `/reservations`, `/admin`, and `/login` are usable
+  at mobile widths with no unintended horizontal overflow.
+- The 30-day calendar remains horizontally scrollable.
+
 ## Project Structure
 
 ```text

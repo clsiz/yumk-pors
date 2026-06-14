@@ -24,8 +24,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const pageError = params.error ? errorMessages[params.error] : undefined;
 
   return (
-    <section className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md items-center px-6 py-16">
-      <div className="w-full rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md items-center px-4 py-10 sm:px-6 sm:py-16">
+      <div className="w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h1 className="text-2xl font-bold text-ink">Sign in</h1>
         <p className="mt-2 text-sm text-slate-600">
           Use the username and password provided by an administrator.

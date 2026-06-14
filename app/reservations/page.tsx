@@ -70,14 +70,14 @@ export default async function ReservationsPage({
 
 function MemberCalendarCallout() {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold text-ink">Request a new slot</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
         To request a new rehearsal slot, choose an available time from the Calendar.
       </p>
       <Link
         href="/calendar"
-        className="mt-5 inline-flex rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+        className="mt-5 inline-flex w-full justify-center rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 sm:w-auto"
       >
         Open Calendar
       </Link>
@@ -99,7 +99,7 @@ function ReservationsShell({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mx-auto max-w-6xl px-6 py-10">
+    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <div>
         <h1 className="text-3xl font-bold text-ink">{title}</h1>
         <p className="mt-2 text-slate-600">{description}</p>
@@ -136,7 +136,7 @@ function StatusMessage({
 
 function MemberRequestList({ requests }: { requests: ReservationRequest[] }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold text-ink">My requests</h2>
       <div className="mt-4 space-y-4">
         {requests.length ? (
@@ -178,7 +178,7 @@ function MemberRequestList({ requests }: { requests: ReservationRequest[] }) {
                   <input type="hidden" name="request_id" value={request.id} />
                   <button
                     type="submit"
-                    className="rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                    className="w-full rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 sm:w-auto"
                   >
                     Cancel pending request
                   </button>
@@ -187,9 +187,9 @@ function MemberRequestList({ requests }: { requests: ReservationRequest[] }) {
             </article>
           ))
         ) : (
-          <p className="text-sm text-slate-500">
+          <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
             You do not have any reservation requests yet.
-          </p>
+          </div>
         )}
       </div>
     </div>
@@ -259,63 +259,63 @@ function AdminRequestSection({
         </span>
       </div>
       <div className="mt-4 space-y-5">
-      {requests.length ? (
-        requests.map((request) => (
-          <article
-            key={request.id}
-            className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
-          >
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-ink">
-                  {request.requester?.full_name ?? "Unknown requester"}
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {request.requester?.username ?? "missing-profile"}
-                </p>
-                <p className="mt-2 text-xs font-medium text-slate-500">
-                  {formatSubmittedDateTime(request.created_at)}
-                </p>
+        {requests.length ? (
+          requests.map((request) => (
+            <article
+              key={request.id}
+              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
+            >
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <h2 className="break-words text-lg font-semibold text-ink">
+                    {request.requester?.full_name ?? "Unknown requester"}
+                  </h2>
+                  <p className="mt-1 break-words text-sm text-slate-500">
+                    {request.requester?.username ?? "missing-profile"}
+                  </p>
+                  <p className="mt-2 text-xs font-medium text-slate-500">
+                    {formatSubmittedDateTime(request.created_at)}
+                  </p>
+                </div>
+                <StatusBadge status={request.status} />
               </div>
-              <StatusBadge status={request.status} />
-            </div>
-            <dl className="mt-5 grid gap-4 text-sm text-slate-600 md:grid-cols-2 lg:grid-cols-3">
-              <Detail label="Phone" value={request.requester?.phone || "-"} />
-              <Detail
-                label="Student number"
-                value={request.requester?.student_number || "-"}
-              />
-              <Detail
-                label="Department"
-                value={request.requester?.department || "-"}
-              />
-              <Detail label="Email" value={request.requester?.email || "-"} />
-              <Detail
-                label="Start"
-                value={formatReservationDateTime(request.start_time)}
-              />
-              <Detail
-                label="End"
-                value={formatReservationDateTime(request.end_time)}
-              />
-              <Detail
-                label="Group members"
-                value={request.group_members_details}
-              />
-              <Detail
-                label="Equipment"
-                value={request.equipment_needs || "None specified"}
-              />
-              <Detail label="Admin note" value={request.admin_note || "-"} />
-            </dl>
-            {showActions ? <AdminActions request={request} /> : null}
-          </article>
-        ))
-      ) : (
-        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
-          {emptyText}
-        </div>
-      )}
+              <dl className="mt-5 grid gap-4 text-sm text-slate-600 md:grid-cols-2 lg:grid-cols-3">
+                <Detail label="Phone" value={request.requester?.phone || "-"} />
+                <Detail
+                  label="Student number"
+                  value={request.requester?.student_number || "-"}
+                />
+                <Detail
+                  label="Department"
+                  value={request.requester?.department || "-"}
+                />
+                <Detail label="Email" value={request.requester?.email || "-"} />
+                <Detail
+                  label="Start"
+                  value={formatReservationDateTime(request.start_time)}
+                />
+                <Detail
+                  label="End"
+                  value={formatReservationDateTime(request.end_time)}
+                />
+                <Detail
+                  label="Group members"
+                  value={request.group_members_details}
+                />
+                <Detail
+                  label="Equipment"
+                  value={request.equipment_needs || "None specified"}
+                />
+                <Detail label="Admin note" value={request.admin_note || "-"} />
+              </dl>
+              {showActions ? <AdminActions request={request} /> : null}
+            </article>
+          ))
+        ) : (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600 shadow-sm">
+            {emptyText}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -329,12 +329,12 @@ function AdminActions({ request }: { request: ReservationRequest }) {
           <input type="hidden" name="request_id" value={request.id} />
           <button
             type="submit"
-            className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-teal-800"
+            className="w-full rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-teal-800 lg:w-auto"
           >
             Approve
           </button>
         </form>
-        <form action={rejectReservationRequestAction} className="flex flex-col gap-2 sm:flex-row">
+        <form action={rejectReservationRequestAction} className="flex min-w-0 flex-col gap-2 sm:flex-row">
           <input type="hidden" name="request_id" value={request.id} />
           <input
             name="admin_note"
@@ -344,7 +344,7 @@ function AdminActions({ request }: { request: ReservationRequest }) {
           />
           <button
             type="submit"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
           >
             Reject
           </button>
@@ -355,7 +355,7 @@ function AdminActions({ request }: { request: ReservationRequest }) {
 
   if (request.status === "approved") {
     return (
-      <form action={cancelApprovedReservationAction} className="mt-5 flex flex-col gap-2 sm:flex-row">
+      <form action={cancelApprovedReservationAction} className="mt-5 flex min-w-0 flex-col gap-2 sm:flex-row">
         <input type="hidden" name="request_id" value={request.id} />
         <input
           name="admin_note"
@@ -365,7 +365,7 @@ function AdminActions({ request }: { request: ReservationRequest }) {
         />
         <button
           type="submit"
-          className="rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+          className="w-full rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 sm:w-auto"
         >
           Cancel reservation
         </button>
@@ -397,7 +397,7 @@ function StatusBadge({ status }: { status: ReservationRequest["status"] }) {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="font-medium text-slate-500">{label}</dt>
       <dd className="mt-1 break-words text-slate-900">{value}</dd>
     </div>

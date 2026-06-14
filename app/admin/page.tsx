@@ -35,7 +35,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   ).length;
 
   return (
-    <section className="mx-auto max-w-6xl px-6 py-10">
+    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <div>
         <p className="text-sm font-semibold uppercase tracking-wider text-accent">
           Admin access
@@ -53,7 +53,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         notice={params.notice}
       />
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <h2 className="text-lg font-semibold text-ink">Reservation queue</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Metric label="Pending requests" value={pendingCount} />
@@ -61,12 +61,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </div>
           <Link
             href="/reservations"
-            className="mt-5 inline-flex rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            className="mt-5 inline-flex w-full justify-center rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 sm:w-auto"
           >
             Manage requests
           </Link>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <h2 className="text-lg font-semibold text-ink">User administration</h2>
           <p className="mt-4 text-sm leading-6 text-slate-600">
             Admin-created users will use username, full name, phone number,
@@ -117,7 +117,7 @@ function AnnouncementManagement({
     <section className="mt-8 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
       <form
         action={createAnnouncementAction}
-        className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+        className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
       >
         <h2 className="text-lg font-semibold text-ink">New announcement</h2>
         <div className="mt-5 space-y-4">
@@ -127,7 +127,7 @@ function AnnouncementManagement({
               name="title"
               type="text"
               required
-              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
             />
           </label>
           <label className="block">
@@ -136,7 +136,7 @@ function AnnouncementManagement({
               name="body"
               required
               rows={5}
-              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
             />
           </label>
         </div>
@@ -147,7 +147,7 @@ function AnnouncementManagement({
           Create announcement
         </button>
       </form>
-      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h2 className="text-lg font-semibold text-ink">Announcements</h2>
         <div className="mt-4 space-y-4">
           {announcements.length ? (
@@ -157,8 +157,8 @@ function AnnouncementManagement({
                 className="rounded-md border border-slate-200 p-4"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h3 className="font-semibold text-slate-900">
+                  <div className="min-w-0">
+                    <h3 className="break-words font-semibold text-slate-900">
                       {announcement.title}
                     </h3>
                     <p className="mt-1 text-xs font-medium text-slate-500">
@@ -179,7 +179,7 @@ function AnnouncementManagement({
                     />
                     <button
                       type="submit"
-                      className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                     >
                       Hide announcement
                     </button>
@@ -188,7 +188,7 @@ function AnnouncementManagement({
               </article>
             ))
           ) : (
-            <p className="text-sm text-slate-500">
+            <p className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
               There are no announcements yet.
             </p>
           )}
@@ -214,7 +214,7 @@ function AnnouncementStatus({ active }: { active: boolean }) {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-slate-200 p-4">
+    <div className="rounded-md border border-slate-200 bg-slate-50/70 p-4">
       <p className="text-sm font-medium text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
     </div>
