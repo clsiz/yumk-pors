@@ -546,8 +546,8 @@ function MemberClosedSlotDetail({
   }
 
   return (
-    <div className="space-y-1 text-xs text-red-700">
-      {title ? <p className="truncate font-medium">{title}</p> : null}
+    <div className="min-h-0 space-y-1 overflow-hidden text-xs text-red-700">
+      {title ? <p className="truncate font-medium leading-4">{title}</p> : null}
       {description ? <p className="line-clamp-2 text-red-600">{description}</p> : null}
     </div>
   );
@@ -689,7 +689,7 @@ function CalendarStatusBadge({
 
 function getSlotCardClassName(slot: CalendarSlotSummary, isClickable: boolean) {
   const base =
-    "flex min-h-24 w-full flex-col justify-between gap-2 rounded-md border p-3 text-left text-sm transition";
+    "flex h-28 w-full flex-col justify-between gap-2 overflow-hidden rounded-md border p-3 text-left text-sm transition";
 
   if (slot.isPast) {
     return `${base} border-slate-200 bg-slate-100 text-slate-500`;

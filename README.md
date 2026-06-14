@@ -763,6 +763,14 @@ Reservation table fields:
 - `calendar_blocks`: `id`, `start_time`, `end_time`, `block_type`, `title`,
   `description`, `created_by`, `created_at`
 
+## Admin Analytics
+
+The admin analytics section supports operational reporting and data-driven
+decision making for rehearsal room management. It helps admins identify peak
+usage times, monitor approval and rejection trends, understand equipment demand,
+track user activity, and make better future scheduling decisions without adding
+extra database tables.
+
 ## Demo Flow
 
 Use seeded or manually created admin/member accounts before the presentation.
