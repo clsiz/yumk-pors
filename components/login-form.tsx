@@ -27,7 +27,7 @@ export function LoginForm({ pageError }: { pageError?: string }) {
           autoComplete="username"
           required
           placeholder="username"
-          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
         />
       </label>
       <label className="block">
@@ -38,7 +38,7 @@ export function LoginForm({ pageError }: { pageError?: string }) {
           autoComplete="current-password"
           required
           placeholder="Password"
-          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
         />
       </label>
       <button

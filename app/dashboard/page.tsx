@@ -43,7 +43,7 @@ export default async function DashboardPage() {
   ).length;
 
   return (
-    <section className="mx-auto max-w-6xl px-6 py-10">
+    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <div>
         <p className="text-sm font-semibold uppercase tracking-wider text-accent">
           {profile.role}
@@ -56,13 +56,13 @@ export default async function DashboardPage() {
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <Link
           href="/calendar"
-          className="rounded-md bg-ink px-4 py-2 text-center text-sm font-semibold text-white transition hover:bg-slate-700"
+          className="rounded-md bg-ink px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-slate-700 sm:w-auto"
         >
           View Calendar
         </Link>
         <Link
           href="/reservations"
-          className="rounded-md border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 transition hover:bg-white"
+          className="rounded-md border border-slate-300 px-4 py-2.5 text-center text-sm font-semibold text-slate-700 transition hover:bg-white sm:w-auto"
         >
           My Requests
         </Link>
@@ -89,11 +89,15 @@ export default async function DashboardPage() {
       ) : (
         <div className="mt-8 grid gap-6 lg:grid-cols-2">
           <DashboardRequestSection
+            actionHref="/calendar"
+            actionLabel="Find a slot"
             emptyText="You do not have upcoming approved reservations."
             requests={upcomingApproved}
             title="Upcoming approved reservations"
           />
           <DashboardRequestSection
+            actionHref="/calendar"
+            actionLabel="Request a slot"
             emptyText="You do not have requests waiting for admin decision."
             requests={pendingRequests}
             title="Pending requests"
@@ -110,7 +114,7 @@ function AnnouncementsSection({
   announcements: Announcement[];
 }) {
   return (
-    <section className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold text-ink">Announcements</h2>
       <div className="mt-4 space-y-4">
         {announcements.length ? (
@@ -133,7 +137,7 @@ function AnnouncementsSection({
             </article>
           ))
         ) : (
-          <p className="text-sm text-slate-500">No active announcements.</p>
+          <EmptyState text="No active announcements." />
         )}
       </div>
     </section>
@@ -142,7 +146,7 @@ function AnnouncementsSection({
 
 function MetricCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <p className="text-sm font-medium text-slate-500">{label}</p>
       <p className="mt-3 text-3xl font-bold text-ink">{value}</p>
     </div>
@@ -150,16 +154,20 @@ function MetricCard({ label, value }: { label: string; value: number }) {
 }
 
 function DashboardRequestSection({
+  actionHref,
+  actionLabel,
   emptyText,
   requests,
   title,
 }: {
+  actionHref?: string;
+  actionLabel?: string;
   emptyText: string;
   requests: ReservationRequest[];
   title: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold text-ink">{title}</h2>
       <div className="mt-4 space-y-4">
         {requests.length ? (
@@ -186,9 +194,33 @@ function DashboardRequestSection({
             </article>
           ))
         ) : (
-          <p className="text-sm text-slate-500">{emptyText}</p>
+          <EmptyState actionHref={actionHref} actionLabel={actionLabel} text={emptyText} />
         )}
       </div>
+    </div>
+  );
+}
+
+function EmptyState({
+  actionHref,
+  actionLabel,
+  text,
+}: {
+  actionHref?: string;
+  actionLabel?: string;
+  text: string;
+}) {
+  return (
+    <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+      <p>{text}</p>
+      {actionHref && actionLabel ? (
+        <Link
+          href={actionHref}
+          className="mt-3 inline-flex w-full justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+        >
+          {actionLabel}
+        </Link>
+      ) : null}
     </div>
   );
 }
