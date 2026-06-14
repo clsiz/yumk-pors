@@ -9,6 +9,7 @@ import {
   fetchAdminCalendarAvailability,
   fetchCalendarPendingRequestCounts,
   fetchMemberCalendarBlockDetails,
+  fetchMemberCalendarRequestsForRange,
   fetchMemberCalendarAvailability,
   getCalendarDates,
   getLocalDateString,
@@ -28,7 +29,7 @@ type CalendarPageProps = {
 };
 
 export default async function CalendarPage({ searchParams }: CalendarPageProps) {
-  const { profile } = await requireProfile();
+  const { profile, user } = await requireProfile();
   const supabase = await createClient();
   const params = searchParams ? await searchParams : {};
   const today = getLocalDateString(new Date());
@@ -54,6 +55,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     { requests: adminRequests, error: adminRequestsError },
     { blocks: adminBlocks, error: adminBlocksError },
     { blockDetails: memberBlockDetails },
+    { requests: memberRequests, error: memberRequestsError },
   ] =
     firstRange && lastRange
       ? await Promise.all([
@@ -88,6 +90,14 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                 lastRange.endTime,
               )
             : Promise.resolve({ blockDetails: [], error: null }),
+          profile.role === "member"
+            ? fetchMemberCalendarRequestsForRange(
+                supabase,
+                user.id,
+                firstRange.startTime,
+                lastRange.endTime,
+              )
+            : Promise.resolve({ requests: [], error: null }),
         ])
       : [
           { availability: [], error: null },
@@ -95,6 +105,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
           { requests: [], error: null },
           { blocks: [], error: null },
           { blockDetails: [] },
+          { requests: [], error: null },
         ];
 
   const calendarDays = buildCalendarSlotSummaries(
@@ -103,19 +114,20 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     pendingCounts,
     profile.role === "admin"
       ? { adminRequests, adminBlocks }
-      : { memberBlockDetails },
+      : { memberBlockDetails, memberRequests },
   );
   const loadError =
     params.error ||
     (availabilityError ||
     pendingCountsError ||
     adminRequestsError ||
-    adminBlocksError
+    adminBlocksError ||
+    memberRequestsError
       ? "Could not load calendar availability. Try again later."
       : undefined);
 
   return (
-    <section className="mx-auto max-w-6xl px-6 py-10">
+    <section className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 sm:py-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-ink">Calendar</h1>

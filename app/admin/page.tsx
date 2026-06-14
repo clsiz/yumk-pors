@@ -3,12 +3,20 @@ import {
   hideAnnouncementAction,
 } from "@/app/admin/actions";
 import Link from "next/link";
+import {
+  buildAnalytics,
+  calendarBlockReportColumns,
+  groupRequestsByUser,
+  profileReportColumns,
+  reservationReportColumns,
+  type Analytics,
+  type RankedItem,
+} from "@/lib/admin-reports";
 import { fetchAllAnnouncements } from "@/lib/announcements";
 import { requireAdmin } from "@/lib/auth/session";
 import {
   formatReservationDateTime,
   formatReservationTimeRange,
-  RESERVATION_TIME_ZONE,
 } from "@/lib/reservations";
 import { createClient } from "@/lib/supabase/server";
 import type { Announcement } from "@/types/announcement";
@@ -22,36 +30,6 @@ type AdminPageProps = {
   }>;
 };
 
-type Analytics = {
-  totalRequests: number;
-  pendingCount: number;
-  approvedCount: number;
-  rejectedCount: number;
-  cancelledCount: number;
-  approvalRate: string;
-  approvedHours: string;
-  blockedSlotCount: number;
-  totalUsers: number;
-  requestedSlots: RankedItem[];
-  requestedDays: RankedItem[];
-  equipmentUsage: RankedItem[];
-  topUsers: RankedItem[];
-};
-
-type RankedItem = {
-  label: string;
-  value: number;
-};
-
-const profileColumns =
-  "id, username, full_name, email, phone, student_number, department, role, is_active, created_at";
-
-const requestColumns =
-  "id, user_id, start_time, end_time, group_members_details, equipment_needs, status, admin_note, created_at, updated_at";
-
-const calendarBlockColumns =
-  "id, start_time, end_time, block_type, title, description, created_by, created_at";
-
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   await requireAdmin();
   const supabase = await createClient();
@@ -64,16 +42,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   ] = await Promise.all([
     supabase
       .from("reservation_requests")
-      .select(requestColumns)
+      .select(reservationReportColumns)
       .order("start_time", { ascending: false }),
     fetchAllAnnouncements(supabase),
     supabase
       .from("profiles")
-      .select(profileColumns)
+      .select(profileReportColumns)
       .order("created_at", { ascending: false }),
     supabase
       .from("calendar_blocks")
-      .select(calendarBlockColumns)
+      .select(calendarBlockReportColumns)
       .order("start_time", { ascending: false }),
   ]);
   const requests = (requestData ?? []) as ReservationRequest[];
@@ -90,7 +68,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       : undefined);
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+    <section className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-10">
       <div>
         <p className="text-sm font-semibold uppercase tracking-wider text-accent">
           Admin access
@@ -100,6 +78,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       <StatusMessage error={loadError} notice={params.notice} />
       <AdminOverview analytics={analytics} />
       <AnalyticsSection analytics={analytics} />
+      <ReportsSection />
       <UserDirectory requests={requests} users={users} />
       <AnnouncementManagement announcements={announcements} />
     </section>
@@ -178,6 +157,42 @@ function AnalyticsSection({ analytics }: { analytics: Analytics }) {
         <RankedList items={analytics.topUsers} title="Top users by approved reservations" />
       </div>
     </section>
+  );
+}
+
+function ReportsSection() {
+  return (
+    <section className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <h2 className="text-lg font-semibold text-ink">Reports / Exports</h2>
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <ExportLink href="/admin/exports/calendar">
+          Export Calendar CSV
+        </ExportLink>
+        <ExportLink href="/admin/exports/reservation-requests">
+          Export Reservation Requests CSV
+        </ExportLink>
+        <ExportLink href="/admin/exports/analytics">
+          Export Analytics CSV
+        </ExportLink>
+      </div>
+    </section>
+  );
+}
+
+function ExportLink({
+  children,
+  href,
+}: {
+  children: React.ReactNode;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-300 px-4 py-2.5 text-center text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -500,146 +515,4 @@ function Detail({ label, value }: { label: string; value: string }) {
       </dd>
     </div>
   );
-}
-
-function buildAnalytics(
-  requests: ReservationRequest[],
-  users: Profile[],
-  blocks: CalendarBlock[],
-): Analytics {
-  const pendingCount = countByStatus(requests, "pending");
-  const approvedCount = countByStatus(requests, "approved");
-  const rejectedCount = countByStatus(requests, "rejected");
-  const cancelledCount = countByStatus(requests, "cancelled");
-  const approvedHours = requests
-    .filter((request) => request.status === "approved")
-    .reduce((total, request) => total + getRequestHours(request), 0);
-  const approvalRate = requests.length
-    ? `${Math.round((approvedCount / requests.length) * 100)}%`
-    : "0%";
-
-  return {
-    totalRequests: requests.length,
-    pendingCount,
-    approvedCount,
-    rejectedCount,
-    cancelledCount,
-    approvalRate,
-    approvedHours: formatHours(approvedHours),
-    blockedSlotCount: blocks.length,
-    totalUsers: users.length,
-    requestedSlots: rankRequests(requests, getRequestTimeSlot),
-    requestedDays: rankRequests(requests, getRequestWeekday),
-    equipmentUsage: rankEquipment(requests),
-    topUsers: rankTopApprovedUsers(requests, users),
-  };
-}
-
-function countByStatus(
-  requests: ReservationRequest[],
-  status: ReservationRequest["status"],
-) {
-  return requests.filter((request) => request.status === status).length;
-}
-
-function groupRequestsByUser(requests: ReservationRequest[]) {
-  const grouped = new Map<string, ReservationRequest[]>();
-
-  requests.forEach((request) => {
-    const current = grouped.get(request.user_id) ?? [];
-    current.push(request);
-    grouped.set(request.user_id, current);
-  });
-
-  grouped.forEach((userRequests) => {
-    userRequests.sort(
-      (a, b) =>
-        new Date(b.start_time).getTime() - new Date(a.start_time).getTime(),
-    );
-  });
-
-  return grouped;
-}
-
-function rankRequests(
-  requests: ReservationRequest[],
-  getLabel: (request: ReservationRequest) => string,
-) {
-  const counts = new Map<string, number>();
-
-  requests.forEach((request) => {
-    const label = getLabel(request);
-    counts.set(label, (counts.get(label) ?? 0) + 1);
-  });
-
-  return rankCounts(counts);
-}
-
-function rankEquipment(requests: ReservationRequest[]) {
-  const counts = new Map<string, number>();
-
-  requests.forEach((request) => {
-    request.equipment_needs
-      ?.split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .forEach((item) => {
-        counts.set(item, (counts.get(item) ?? 0) + 1);
-      });
-  });
-
-  return rankCounts(counts);
-}
-
-function rankTopApprovedUsers(
-  requests: ReservationRequest[],
-  users: Profile[],
-) {
-  const usersById = new Map(users.map((user) => [user.id, user]));
-  const counts = new Map<string, number>();
-
-  requests
-    .filter((request) => request.status === "approved")
-    .forEach((request) => {
-      const user = usersById.get(request.user_id);
-      const label = user
-        ? `${user.full_name} (${user.username})`
-        : "Unknown user";
-      counts.set(label, (counts.get(label) ?? 0) + 1);
-    });
-
-  return rankCounts(counts);
-}
-
-function rankCounts(counts: Map<string, number>) {
-  return Array.from(counts.entries())
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
-    .slice(0, 5);
-}
-
-function getRequestTimeSlot(request: ReservationRequest) {
-  return formatReservationTimeRange(request.start_time, request.end_time);
-}
-
-function getRequestWeekday(request: ReservationRequest) {
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "long",
-    timeZone: RESERVATION_TIME_ZONE,
-  }).format(new Date(request.start_time));
-}
-
-function getRequestHours(request: ReservationRequest) {
-  const start = new Date(request.start_time).getTime();
-  const end = new Date(request.end_time).getTime();
-
-  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) {
-    return 0;
-  }
-
-  return (end - start) / (1000 * 60 * 60);
-}
-
-function formatHours(hours: number) {
-  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
 }
