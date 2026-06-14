@@ -771,6 +771,15 @@ usage times, monitor approval and rejection trends, understand equipment demand,
 track user activity, and make better future scheduling decisions without adding
 extra database tables.
 
+Admins can also export calendar availability, reservation request history, and
+analytics reports as CSV files for Excel or Google Sheets. These exports support
+operational analysis, historical tracking, calendar usage review, reporting,
+peak usage analysis, equipment demand review, and approval/rejection trend
+monitoring.
+
+Member calendar labels distinguish the current user's own pending and approved
+slots while keeping other users' reservations anonymous.
+
 ## Demo Flow
 
 Use seeded or manually created admin/member accounts before the presentation.

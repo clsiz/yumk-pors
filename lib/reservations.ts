@@ -318,6 +318,27 @@ export async function fetchMemberReservationRequests(
   };
 }
 
+export async function fetchMemberCalendarRequestsForRange(
+  supabase: SupabaseClient,
+  userId: string,
+  startTime: string,
+  endTime: string,
+) {
+  const { data, error } = await supabase
+    .from("reservation_requests")
+    .select(reservationRequestColumns)
+    .eq("user_id", userId)
+    .in("status", ["pending", "approved"])
+    .lt("start_time", endTime)
+    .gt("end_time", startTime)
+    .order("start_time", { ascending: true });
+
+  return {
+    requests: (data ?? []) as ReservationRequest[],
+    error,
+  };
+}
+
 export async function fetchAdminReservationRequests(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("reservation_requests")
@@ -484,6 +505,7 @@ export function buildCalendarSlotSummaries(
     adminRequests?: AdminReservationRequest[];
     adminBlocks?: CalendarBlock[];
     memberBlockDetails?: MemberCalendarBlockDetailsRow[];
+    memberRequests?: ReservationRequest[];
   } = {},
 ) {
   return dates.map((date) =>
@@ -556,6 +578,35 @@ export function buildCalendarSlotSummaries(
             ),
           )
         : undefined;
+      const memberApprovedRequest = range
+        ? options.memberRequests?.find(
+            (request) =>
+              request.status === "approved" &&
+              hasOverlap(
+                range.startTime,
+                range.endTime,
+                request.start_time,
+                request.end_time,
+              ),
+          )
+        : undefined;
+      const memberPendingRequest = range
+        ? options.memberRequests?.find(
+            (request) =>
+              request.status === "pending" &&
+              hasOverlap(
+                range.startTime,
+                range.endTime,
+                request.start_time,
+                request.end_time,
+              ),
+          )
+        : undefined;
+      const memberRequestStatus = memberApprovedRequest
+        ? "approved"
+        : memberPendingRequest
+          ? "pending"
+          : undefined;
 
       const status = occupiedSlot?.slot_status === "Closed"
         ? "closed"
@@ -583,6 +634,13 @@ export function buildCalendarSlotSummaries(
           approvedRequest?.requester?.username ??
           adminSlot?.requester_username ??
           undefined,
+        memberRequestStatus,
+        memberStatusLabel:
+          memberRequestStatus === "approved"
+            ? "Your reservation"
+            : memberRequestStatus === "pending"
+              ? "Your pending request"
+              : undefined,
         blockTitle:
           block?.title ??
           memberBlockDetail?.block_title ??

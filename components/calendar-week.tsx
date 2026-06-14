@@ -126,6 +126,11 @@ function CalendarSlotCard({
         </span>
         <CalendarStatusBadge status={slot.statusLabel} />
       </div>
+      {role === "member" && slot.memberStatusLabel ? (
+        <MemberOwnedSlotLabel status={slot.memberRequestStatus}>
+          {slot.memberStatusLabel}
+        </MemberOwnedSlotLabel>
+      ) : null}
       {role === "admin" ? (
         <AdminSlotDetail
           blockTitle={slot.blockTitle}
@@ -683,6 +688,27 @@ function CalendarStatusBadge({
   return (
     <span className={`max-w-full rounded-full px-2 py-1 text-[0.68rem] font-semibold leading-none ${colorClass}`}>
       {status}
+    </span>
+  );
+}
+
+function MemberOwnedSlotLabel({
+  children,
+  status,
+}: {
+  children: React.ReactNode;
+  status?: "pending" | "approved";
+}) {
+  const colorClass =
+    status === "approved"
+      ? "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200"
+      : "bg-sky-100 text-sky-800 ring-1 ring-sky-200";
+
+  return (
+    <span
+      className={`w-fit max-w-full rounded-full px-2 py-1 text-[0.68rem] font-semibold leading-none ${colorClass}`}
+    >
+      {children}
     </span>
   );
 }

@@ -13,6 +13,8 @@ export type CalendarSlotSummary = {
   pendingCount?: number;
   reservationRequesterName?: string;
   reservationRequesterUsername?: string;
+  memberRequestStatus?: "pending" | "approved";
+  memberStatusLabel?: "Your pending request" | "Your reservation";
   blockTitle?: string;
   blockDescription?: string;
   pendingRequests?: AdminReservationRequest[];
