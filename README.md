@@ -7,8 +7,8 @@ The system manages one rehearsal room. Admins create user accounts, and all
 users sign in with a username and password.
 
 This version supports calendar-based reservation request creation, member
-cancellation of pending requests, and admin approval, rejection, and
-cancellation.
+cancellation of pending requests and approved future reservations, and admin
+approval, rejection, and cancellation.
 
 ## Tech Stack
 
@@ -166,6 +166,11 @@ requests plus approved reservations whose `end_time` is in the future. Members
 can also request or use at most 2 active slots on the same `Europe/Istanbul`
 local calendar date. Rejected and cancelled requests do not count toward these
 limits.
+
+Members may cancel their own pending requests and their own approved
+reservations whose `end_time` is still in the future. Cancelling an approved
+reservation changes it to `cancelled` and releases the slot for other members
+unless another approved reservation or calendar block overlaps it.
 
 The calendar is the primary member request creation surface. Members request a
 new rehearsal slot by choosing an available time from `/calendar`, then track
@@ -806,6 +811,7 @@ Use seeded or manually created admin/member accounts before the presentation.
 - Member login redirects to `/dashboard`.
 - Member reservation request creation from an available calendar slot works.
 - Member pending requests can still be cancelled by the member.
+- Member approved future reservations can be cancelled by the member.
 - Admin approval and rejection still work from `/reservations`.
 - Admin approval and rejection still work from calendar slot details.
 - Admin cancellation of an approved reservation still works.

@@ -150,6 +150,80 @@ export async function cancelOwnPendingRequestAction(formData: FormData) {
   redirectWithMessage("notice", "Reservation request cancelled.");
 }
 
+export async function cancelOwnApprovedReservationAction(formData: FormData) {
+  const { profile, user } = await requireProfile();
+  const supabase = await createClient();
+  const requestId = getStringValue(formData, "request_id");
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  if (profile.role !== "member") {
+    redirectWithMessage("error", "Only members can cancel their own reservations.");
+  }
+
+  if (!requestId) {
+    redirectWithMessage("error", "Reservation request was not found.");
+  }
+
+  const { request, error: fetchError } = await getReservationRequest(requestId);
+
+  if (fetchError || !request) {
+    redirectWithMessage("error", "Reservation request was not found.");
+  }
+
+  const endTime = new Date(request.end_time).getTime();
+
+  if (
+    request.user_id !== user.id ||
+    request.status !== "approved" ||
+    Number.isNaN(endTime) ||
+    endTime <= now.getTime()
+  ) {
+    redirectWithMessage(
+      "error",
+      "Only your own future approved reservations can be cancelled.",
+    );
+  }
+
+  const { data: cancelledRequest, error } = await supabase
+    .from("reservation_requests")
+    .update({
+      status: "cancelled",
+      updated_at: nowIso,
+    })
+    .eq("id", request.id)
+    .eq("user_id", user.id)
+    .eq("status", "approved")
+    .gt("end_time", nowIso)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !cancelledRequest) {
+    redirectWithMessage("error", "Could not cancel the reservation. Try again.");
+  }
+
+  const { error: historyError } = await insertStatusHistory({
+    requestId: request.id,
+    changedBy: user.id,
+    oldStatus: "approved",
+    newStatus: "cancelled",
+    note: "Cancelled by requester.",
+  });
+
+  if (historyError) {
+    redirectWithMessage(
+      "error",
+      "Reservation was cancelled, but status history could not be saved.",
+    );
+  }
+
+  revalidatePath("/reservations");
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+  revalidatePath("/admin");
+  redirectWithMessage("notice", "Reservation cancelled.");
+}
+
 export async function approveReservationRequestAction(formData: FormData) {
   await requireAdmin();
   const supabase = await createClient();

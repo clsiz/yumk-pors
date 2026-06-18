@@ -1,6 +1,7 @@
 import {
   approveReservationRequestAction,
   cancelApprovedReservationAction,
+  cancelOwnApprovedReservationAction,
   cancelOwnPendingRequestAction,
   rejectReservationRequestAction,
 } from "@/app/reservations/actions";
@@ -130,6 +131,8 @@ function StatusMessage({
 }
 
 function MemberRequestList({ requests }: { requests: ReservationRequest[] }) {
+  const now = new Date();
+
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold text-ink">My requests</h2>
@@ -175,9 +178,31 @@ function MemberRequestList({ requests }: { requests: ReservationRequest[] }) {
                     type="submit"
                     className="w-full rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 sm:w-auto"
                   >
-                    Cancel pending request
+                    Cancel request
                   </button>
                 </form>
+              ) : null}
+              {isFutureApprovedReservation(request, now) ? (
+                <details className="mt-4 rounded-md border border-red-100 bg-red-50/40 p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-red-700">
+                    Cancel reservation
+                  </summary>
+                  <form
+                    action={cancelOwnApprovedReservationAction}
+                    className="mt-3 space-y-3"
+                  >
+                    <input type="hidden" name="request_id" value={request.id} />
+                    <p className="text-sm leading-6 text-red-700">
+                      This will release the approved slot for other members.
+                    </p>
+                    <button
+                      type="submit"
+                      className="w-full rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-800 sm:w-auto"
+                    >
+                      Confirm cancellation
+                    </button>
+                  </form>
+                </details>
               ) : null}
             </article>
           ))
@@ -188,6 +213,16 @@ function MemberRequestList({ requests }: { requests: ReservationRequest[] }) {
         )}
       </div>
     </div>
+  );
+}
+
+function isFutureApprovedReservation(
+  request: ReservationRequest,
+  now: Date,
+) {
+  return (
+    request.status === "approved" &&
+    new Date(request.end_time) > now
   );
 }
 
