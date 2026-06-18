@@ -7,8 +7,9 @@ The system manages one rehearsal room. Admins create user accounts, and all
 users sign in with a username and password.
 
 This version supports calendar-based reservation request creation, member
-cancellation of pending requests and approved future reservations, and admin
-approval, rejection, and cancellation.
+cancellation of their own pending requests and approved future reservations,
+slot release after member cancellation, and admin approval, rejection, and
+cancellation.
 
 ## Tech Stack
 
@@ -171,6 +172,50 @@ Members may cancel their own pending requests and their own approved
 reservations whose `end_time` is still in the future. Cancelling an approved
 reservation changes it to `cancelled` and releases the slot for other members
 unless another approved reservation or calendar block overlaps it.
+
+The existing RLS policy for member cancellation of their own pending requests
+should remain unchanged. Member cancellation of approved future reservations
+requires a separate update policy that lets a member update only their own
+currently approved, not-yet-ended reservation into the `cancelled` status:
+
+```sql
+create policy "Members can cancel own approved future reservations"
+on public.reservation_requests
+for update
+to authenticated
+using (
+  auth.uid() = user_id
+  and status = 'approved'
+  and end_time > now()
+)
+with check (
+  auth.uid() = user_id
+  and status = 'cancelled'
+);
+```
+
+Members also need permission to insert the status-history row for their own
+approved-reservation cancellation. This policy allows only the authenticated
+member to record an `approved` to `cancelled` transition for a reservation row
+they own:
+
+```sql
+create policy "Members can insert own approved cancellation history"
+on public.reservation_status_history
+for insert
+to authenticated
+with check (
+  changed_by = auth.uid()
+  and old_status = 'approved'
+  and new_status = 'cancelled'
+  and exists (
+    select 1
+      from public.reservation_requests request
+     where request.id = reservation_status_history.reservation_request_id
+       and request.user_id = auth.uid()
+  )
+);
+```
 
 The calendar is the primary member request creation surface. Members request a
 new rehearsal slot by choosing an available time from `/calendar`, then track
